@@ -42,11 +42,9 @@ export function BookmarkCard({
   const bookmarkGroup = groups.find(g => g.id === bookmark.groupId)
   const groupColor = bookmarkGroup?.color
   
-  // Determine which URL to use
-  const hasInternalUrl = Boolean(bookmark.internalUrl)
-  const currentUrl = hasInternalUrl && bookmark.internalUrl
-    ? bookmark.internalUrl 
-    : bookmark.externalUrl || bookmark.url
+  // Determine which URL to use - ALWAYS prefer external/FQDN over internal/localhost
+  // Priority: externalUrl (FQDN) > url > internalUrl (localhost)
+  const currentUrl = bookmark.externalUrl || bookmark.url || bookmark.internalUrl || ''
     
   // Get enhanced favicon with brand detection
   const faviconUrl = bookmark.icon && !bookmark.icon.includes('://') 

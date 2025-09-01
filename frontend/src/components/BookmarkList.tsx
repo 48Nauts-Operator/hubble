@@ -39,11 +39,12 @@ function BookmarkRow({ bookmark, onEdit, onDelete }: BookmarkRowProps) {
   const bookmarkGroup = groups.find(g => g.id === bookmark.groupId)
   const groupColor = bookmarkGroup?.color
   
-  const currentUrl = bookmark.internalUrl || bookmark.externalUrl || bookmark.url
+  // Priority: externalUrl (FQDN) > url > internalUrl (localhost)
+  const currentUrl = bookmark.externalUrl || bookmark.url || bookmark.internalUrl || ''
   
   const faviconUrl = bookmark.icon && !bookmark.icon.includes('://') 
     ? null 
-    : getEnhancedFaviconUrl(bookmark.url, bookmark.title)
+    : getEnhancedFaviconUrl(bookmark.url || '', bookmark.title)
     
   const brandColors = getBrandColors(bookmark.url, bookmark.title)
   
@@ -131,7 +132,7 @@ function BookmarkRow({ bookmark, onEdit, onDelete }: BookmarkRowProps) {
           <p className="text-xs text-muted-foreground truncate">
             {(() => {
               try {
-                return new URL(currentUrl).hostname
+                return currentUrl ? new URL(currentUrl).hostname : ''
               } catch {
                 return currentUrl
               }

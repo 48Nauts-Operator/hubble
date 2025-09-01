@@ -143,7 +143,7 @@ router.post('/',
   handleValidationErrors,
   async (req, res, next) => {
     try {
-      const {
+      let {
         title,
         url,
         internal_url,
@@ -155,6 +155,25 @@ router.post('/',
         color,
         environment
       } = req.body;
+      
+      // URL priority logic: If we have both internal and external URLs,
+      // the external (FQDN) should be the primary URL
+      if (external_url && internal_url) {
+        // External URL becomes the primary
+        url = external_url;
+        // Keep internal_url as is for secondary access
+      } else if (internal_url && !external_url) {
+        // Only internal URL provided - check if it's actually a localhost URL
+        if (internal_url.includes('localhost') || internal_url.includes('127.0.0.1') || internal_url.includes('192.168')) {
+          // It's truly internal, keep it as internal_url
+          url = url || internal_url; // Use provided url or fallback to internal
+        } else {
+          // It's actually an external URL mislabeled
+          external_url = internal_url;
+          url = external_url;
+          internal_url = null;
+        }
+      }
       
       // Check if URL already exists
       const existing = await req.db.get('SELECT id FROM bookmarks WHERE url = ?', [url]);

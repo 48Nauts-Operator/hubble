@@ -27,6 +27,10 @@ Hubble is a modern, self-hosted bookmark dashboard designed for developers and t
 ## 🚨 CRITICAL: Development Environment
 **IMPORTANT**: Always check if the docker container are up and running and health before you tell André the system is ready.
 - Always make sure you deployed the frontend or backend changes
+- Always make sure you update the versioning and new features or fixes in the UI
+
+## 🚨 CRITICAL: Git Updates
+**IMPORTANT**: Always create new PRs with any feature changes you deployed. 
 
 ## 🏗️ Architecture Overview
 
