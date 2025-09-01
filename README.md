@@ -48,14 +48,14 @@ Whether you're managing development environments, documentation links, or team r
 ## 📸 Screenshots
 
 <div align="center">
-  <img src="docs/screenshots/dashboard.png" alt="Hubble Dashboard" width="800">
-  <p><em>Main dashboard with bookmark cards</em></p>
+  <img src="docs/screenshot-card-view.png" alt="Hubble Dashboard - Card View" width="900">
+  <p><em>Main dashboard showing bookmark cards with environment tags and quick actions</em></p>
   
-  <img src="docs/screenshots/list-view.png" alt="List View" width="800">
-  <p><em>Compact list view for dense information</em></p>
+  <img src="docs/Screenshot 2025-09-01 at 18.23.40.png" alt="Documentation View" width="900">
+  <p><em>Documentation group with 20 developer resources organized in list view</em></p>
   
-  <img src="docs/screenshots/discovery.png" alt="Docker Discovery" width="800">
-  <p><em>Automatic Docker container discovery</em></p>
+  <img src="docs/screenshot-discovery.png" alt="Docker Discovery" width="900">
+  <p><em>Container Discovery - Automatically detect and import Docker containers as bookmarks</em></p>
 </div>
 
 ## 🚀 Quick Start
