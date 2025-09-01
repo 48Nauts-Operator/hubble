@@ -58,34 +58,39 @@ router.post('/import', async (req, res) => {
           if (existingGroup) {
             groupId = existingGroup.id;
           } else {
-            const groupResult = await req.db.run(
-              'INSERT INTO groups (name, icon, color, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+            // Generate a unique ID for the group
+            groupId = `docker-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            await req.db.run(
+              'INSERT INTO groups (id, name, icon, color, description, created_at) VALUES (?, ?, ?, ?, ?, ?)',
               [
+                groupId,
                 service.suggested_group,
                 '🐳', // Docker icon
                 '#0ea5e9', // Sky blue
                 `Auto-created group for ${service.detected_type} services`,
-                new Date().toISOString(),
                 new Date().toISOString()
               ]
             );
-            groupId = groupResult.lastID;
           }
         }
         
         // Create bookmark from discovered service
         const bookmarkData = service.bookmark_data;
-        const result = await req.db.run(
+        // Generate a unique ID for the bookmark
+        const bookmarkId = Buffer.from(bookmarkData.url + Date.now()).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substr(0, 20);
+        
+        await req.db.run(
           `INSERT INTO bookmarks (
-            group_id, title, url, internal_url, external_url, description,
+            id, group_id, title, url, internal_url, external_url, description,
             icon, tags, environment, metadata, auto_discovered,
             created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
+            bookmarkId,
             groupId,
             bookmarkData.title,
             bookmarkData.url,
-            bookmarkData.internalUrl,
+            bookmarkData.internalUrl || null,
             bookmarkData.url,
             bookmarkData.description,
             bookmarkData.icon,
@@ -107,14 +112,14 @@ router.post('/import', async (req, res) => {
         
         imported.push({
           service_id: service.id,
-          bookmark_id: result.lastID,
+          bookmark_id: bookmarkId,
           title: bookmarkData.title,
           url: bookmarkData.url
         });
         
         // Emit WebSocket event for real-time UI updates
         req.io.emit('bookmark:created', {
-          id: result.lastID,
+          id: bookmarkId,
           title: bookmarkData.title,
           groupId: groupId,
           auto_discovered: true
