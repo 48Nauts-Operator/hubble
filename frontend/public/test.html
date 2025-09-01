@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>API Test</title>
+</head>
+<body>
+    <h1>Hubble API Test</h1>
+    <div id="results"></div>
+    
+    <script>
+        async function testAPIs() {
+            const results = document.getElementById('results');
+            
+            try {
+                // Test bookmarks API
+                const bookmarksRes = await fetch('http://localhost:8889/api/bookmarks');
+                const bookmarksData = await bookmarksRes.json();
+                results.innerHTML += `<p>Bookmarks API: ${JSON.stringify(bookmarksData)}</p>`;
+                
+                // Test groups API  
+                const groupsRes = await fetch('http://localhost:8889/api/groups');
+                const groupsData = await groupsRes.json();
+                results.innerHTML += `<p>Groups API: ${JSON.stringify(groupsData)}</p>`;
+                
+            } catch (error) {
+                results.innerHTML += `<p style="color: red">Error: ${error.message}</p>`;
+            }
+        }
+        
+        testAPIs();
+    </script>
+</body>
+</html>

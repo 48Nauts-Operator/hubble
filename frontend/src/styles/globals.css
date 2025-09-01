@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    /* Mint primary color */
+    --primary: 165 82% 51%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 165 30% 96%;
+    --secondary-foreground: 165 72% 40%;
+    --muted: 165 30% 96%;
+    --muted-foreground: 165 10% 46%;
+    --accent: 165 60% 95%;
+    --accent-foreground: 165 72% 40%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 165 30% 91%;
+    --input: 165 30% 91%;
+    --ring: 165 82% 51%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    /* Dark royal navy blue background - MORE VISIBLE */
+    --background: 223 47% 15%; /* #1a2332 - Visible navy blue */
+    --foreground: 0 0% 95%;
+    --card: 223 40% 18%; /* #1f2937 - Slightly lighter navy */
+    --card-foreground: 0 0% 95%;
+    --popover: 223 40% 18%;
+    --popover-foreground: 0 0% 95%;
+    /* Mint primary color for dark mode */
+    --primary: 165 82% 51%;
+    --primary-foreground: 224 71% 8%;
+    --secondary: 224 50% 17%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 224 45% 25%;
+    --muted-foreground: 165 40% 70%;
+    --accent: 165 60% 40%;
+    --accent-foreground: 165 82% 70%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    /* Mint colored borders - BRIGHT AND VISIBLE */
+    --border: 165 82% 51%; /* Same as primary - bright mint */
+    --input: 165 82% 51%; /* Bright mint inputs */
+    --ring: 165 82% 51%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Custom mint accent colors */
+@layer utilities {
+  .bg-hubble-primary {
+    background: linear-gradient(135deg, #34d399 0%, #6ee7b7 100%);
+  }
+  
+  .text-hubble {
+    color: #34d399;
+  }
+  
+  .border-hubble {
+    border-color: #34d399;
+  }
+  
+  .hover\:bg-hubble-light:hover {
+    background-color: #6ee7b7;
+  }
+  
+  .hover\:border-hubble:hover {
+    border-color: #34d399;
+  }
+  
+  /* Glass morphism effects */
+  .glass {
+    @apply bg-slate-800/20 backdrop-blur-xl border-slate-700/50;
+  }
+  
+  .glass-dark {
+    @apply bg-slate-900/30 backdrop-blur-xl border-slate-700/30;
+  }
+  
+  .glass-card {
+    @apply bg-gradient-to-br from-slate-800/40 via-slate-800/30 to-slate-700/20 backdrop-blur-lg border-slate-700/40;
+  }
+  
+  .glass-hover {
+    @apply hover:bg-slate-700/30 hover:border-slate-600/50 transition-all duration-300;
+  }
+}
