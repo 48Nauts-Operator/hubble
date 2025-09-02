@@ -106,6 +106,18 @@ export function CreateShareWizard({ isOpen, onClose, onSubmit, isSubmitting }: C
   }
 
   const handleSubmit = async () => {
+    // Final validation
+    if (!formData.name.trim()) {
+      console.error('Share name is required')
+      return
+    }
+    
+    if (formData.selectedGroups.length === 0 && formData.selectedBookmarks.length === 0) {
+      console.error('At least one group or bookmark must be selected')
+      return
+    }
+    
+    console.log('Submitting share data:', formData)
     await onSubmit(formData)
   }
 

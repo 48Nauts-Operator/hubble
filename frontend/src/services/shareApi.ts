@@ -138,12 +138,10 @@ function transformShare(backendShare: any): SharedView {
 
 // Transform frontend share data to backend format
 function transformShareForBackend(share: CreateShareRequest | UpdateShareRequest): any {
-  return {
+  const result: any = {
     name: share.name,
     description: share.description,
     access_type: share.isPublic ? 'public' : 'restricted',
-    expires_at: share.access?.expiresAt,
-    max_uses: share.access?.maxUses,
     included_groups: share.selectedGroups || [],
     excluded_groups: [],
     included_tags: [],
@@ -155,13 +153,27 @@ function transformShareForBackend(share: CreateShareRequest | UpdateShareRequest
       canCreateGroups: false,
       canSeeAnalytics: false
     },
-    theme: share.appearance?.theme || 'auto',
-    layout: 'grid',
-    branding: share.appearance?.title || share.appearance?.description ? {
-      title: share.appearance?.title,
-      subtitle: share.appearance?.description
-    } : null
+    theme: share.appearance?.theme === 'system' ? 'auto' : (share.appearance?.theme || 'auto'),
+    layout: 'grid'
   }
+
+  // Only add expires_at and max_uses if they have values
+  if (share.access?.expiresAt) {
+    result.expires_at = share.access.expiresAt
+  }
+  if (share.access?.maxUses) {
+    result.max_uses = share.access.maxUses
+  }
+
+  // Only add branding if title or description exists
+  if (share.appearance?.title || share.appearance?.description) {
+    result.branding = {
+      title: share.appearance?.title || '',
+      subtitle: share.appearance?.description || ''
+    }
+  }
+
+  return result
 }
 
 export const shareApi = {
