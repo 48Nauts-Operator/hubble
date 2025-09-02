@@ -29,6 +29,23 @@ interface Version {
 
 const versions: Version[] = [
   {
+    version: '1.3.0',
+    date: 'September 2, 2025',
+    type: 'minor',
+    icon: <GitBranch className="h-5 w-5" />,
+    color: '#ec4899',
+    features: [
+      'Complete sharing system with unique shareable links',
+      'Public and private shared views with permissions',
+      'Share creation wizard with 5-step configuration',
+      'Drag-and-drop group reordering in sidebar',
+      'Backup/restore functionality with JSON export/import',
+      'Fixed Docker discovery ID generation',
+      'Fixed URL priority (FQDN always takes precedence)',
+      'Share analytics and access tracking'
+    ]
+  },
+  {
     version: '1.2.0',
     date: 'September 1, 2025',
     type: 'minor',

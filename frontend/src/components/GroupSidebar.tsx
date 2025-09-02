@@ -468,7 +468,7 @@ export function GroupSidebar({ onAddGroup, onEditGroup, onDeleteGroup }: GroupSi
                 }}
                 className="flex items-center space-x-2 text-xs text-muted-foreground hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors cursor-pointer"
               >
-                <span>v1.2.0</span>
+                <span>v1.3.0</span>
                 <span className="text-[10px]">• View changelog</span>
               </a>
             </>
