@@ -99,14 +99,14 @@ export const bookmarkApi = {
   async updateBookmark(id: string, bookmark: Partial<Bookmark>): Promise<Bookmark> {
     // Map frontend field names to backend field names
     const backendBookmark: any = {}
-    if (bookmark.title !== undefined) backendBookmark.title = bookmark.title
-    if (bookmark.url !== undefined) backendBookmark.url = bookmark.url
-    if (bookmark.internalUrl !== undefined) backendBookmark.internal_url = bookmark.internalUrl
-    if (bookmark.externalUrl !== undefined) backendBookmark.external_url = bookmark.externalUrl
-    if (bookmark.description !== undefined) backendBookmark.description = bookmark.description
-    if (bookmark.groupId !== undefined) backendBookmark.group_id = bookmark.groupId
+    if (bookmark.title !== undefined && bookmark.title) backendBookmark.title = bookmark.title
+    if (bookmark.url !== undefined && bookmark.url) backendBookmark.url = bookmark.url
+    if (bookmark.internalUrl !== undefined && bookmark.internalUrl) backendBookmark.internal_url = bookmark.internalUrl
+    if (bookmark.externalUrl !== undefined && bookmark.externalUrl) backendBookmark.external_url = bookmark.externalUrl
+    if (bookmark.description !== undefined && bookmark.description) backendBookmark.description = bookmark.description
+    if (bookmark.groupId !== undefined && bookmark.groupId) backendBookmark.group_id = bookmark.groupId
     if (bookmark.tags !== undefined) backendBookmark.tags = bookmark.tags
-    if (bookmark.icon !== undefined) backendBookmark.icon = bookmark.icon
+    if (bookmark.icon !== undefined && bookmark.icon) backendBookmark.icon = bookmark.icon
     if (bookmark.environment !== undefined) backendBookmark.environment = bookmark.environment
     if (bookmark.healthStatus !== undefined) {
       backendBookmark.health_status = bookmark.healthStatus === 'healthy' ? 'up' :
@@ -191,6 +191,16 @@ export const groupApi = {
     if (!response.ok) {
       throw new ApiError(response.status, `HTTP error! status: ${response.status}`)
     }
+  },
+
+  async reorderGroups(groups: { id: string; sort_order: number }[]): Promise<BookmarkGroup[]> {
+    const response = await fetch(`${API_BASE_URL}/groups/reorder`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ groups })
+    })
+    const data = await handleResponse<any[]>(response)
+    return data.map(transformGroup)
   }
 }
 

@@ -101,4 +101,21 @@
   .glass-hover {
     @apply hover:bg-slate-700/30 hover:border-slate-600/50 transition-all duration-300;
   }
+  
+  /* Drag and drop styles */
+  .drag-handle {
+    @apply cursor-grab active:cursor-grabbing;
+  }
+  
+  .drag-overlay {
+    @apply shadow-2xl rotate-1 scale-105;
+  }
+  
+  .drag-ghost {
+    @apply opacity-50 scale-95 blur-[1px];
+  }
+  
+  .drop-indicator {
+    @apply border-emerald-400 bg-emerald-50/10 dark:bg-emerald-400/10;
+  }
 }

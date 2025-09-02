@@ -304,8 +304,8 @@ router.put('/:id',
       
       // Log analytics event
       await req.db.run(
-        'INSERT INTO analytics (bookmark_id, event_type, metadata) VALUES (?, ?, ?)',
-        [id, 'update', JSON.stringify({ changes: Object.keys(updates) })]
+        'INSERT INTO analytics (bookmark_id, event_type) VALUES (?, ?)',
+        [id, 'update']
       );
       
       // Emit WebSocket event

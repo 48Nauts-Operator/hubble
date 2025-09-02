@@ -1,4 +1,4 @@
-import { Search, Moon, Sun, Plus, Container, LayoutGrid, List } from 'lucide-react'
+import { Search, Moon, Sun, Plus, Container, LayoutGrid, List, Settings, Share2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useBookmarkStore } from '@/stores/useBookmarkStore'
@@ -10,9 +10,11 @@ interface HeaderProps {
   onAddBookmark?: () => void
   onAddGroup?: () => void
   onDiscover?: () => void
+  onSettings?: () => void
+  onShare?: () => void
 }
 
-export function Header({ onAddBookmark, onAddGroup, onDiscover }: HeaderProps) {
+export function Header({ onAddBookmark, onAddGroup, onDiscover, onSettings, onShare }: HeaderProps) {
   const { searchQuery, setSearchQuery } = useBookmarkStore()
   const { isDarkMode, toggleTheme } = useThemeStore()
   const { viewMode, toggleViewMode } = useViewStore()
@@ -85,6 +87,17 @@ export function Header({ onAddBookmark, onAddGroup, onDiscover }: HeaderProps) {
             Discover
           </Button>
 
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onShare}
+            className="hidden sm:flex hover:text-emerald-500 dark:hover:text-emerald-400"
+            title="Manage shares"
+          >
+            <Share2 className="h-4 w-4 mr-2" />
+            Share
+          </Button>
+
           {/* View Toggle */}
           <Button
             variant="outline"
@@ -98,6 +111,17 @@ export function Header({ onAddBookmark, onAddGroup, onDiscover }: HeaderProps) {
             ) : (
               <LayoutGrid className="h-4 w-4" />
             )}
+          </Button>
+
+          {/* Settings Button */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onSettings}
+            className="hover:text-emerald-500 dark:hover:text-emerald-400"
+            title="Settings & Backup"
+          >
+            <Settings className="h-4 w-4" />
           </Button>
 
           <Button

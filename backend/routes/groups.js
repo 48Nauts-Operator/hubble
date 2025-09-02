@@ -186,6 +186,39 @@ router.put('/:id',
   }
 );
 
+// PUT /api/groups/reorder - Update sort order for multiple groups
+router.put('/reorder',
+  body('groups').isArray(),
+  body('groups.*.id').notEmpty(),
+  body('groups.*.sort_order').isInt(),
+  handleValidationErrors,
+  async (req, res, next) => {
+    try {
+      const { groups } = req.body;
+      
+      // Update each group's sort_order
+      for (const group of groups) {
+        await req.db.run(
+          'UPDATE groups SET sort_order = ? WHERE id = ?',
+          [group.sort_order, group.id]
+        );
+      }
+      
+      // Return updated groups
+      const updatedGroups = await req.db.all(
+        'SELECT * FROM groups ORDER BY sort_order ASC, name ASC'
+      );
+      
+      // Emit WebSocket event
+      req.io.emit('groups:reordered', updatedGroups);
+      
+      res.json(updatedGroups);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // DELETE /api/groups/:id - Delete group
 router.delete('/:id',
   param('id').notEmpty(),

@@ -61,6 +61,7 @@ interface BookmarkStore {
   addGroup: (group: BookmarkGroup) => void
   updateGroup: (id: string, group: Partial<BookmarkGroup>) => void
   deleteGroup: (id: string) => void
+  reorderGroups: (groupIds: string[]) => void
   setSearchQuery: (query: string) => void
   setSelectedGroupId: (groupId: string | null) => void
   setSortBy: (sortBy: SortOption) => void
@@ -137,6 +138,16 @@ export const useBookmarkStore = create<BookmarkStore>()(
           groups: state.groups.filter((group) => group.id !== id),
           selectedGroupId: state.selectedGroupId === id ? null : state.selectedGroupId
         })),
+      
+      reorderGroups: (groupIds) =>
+        set((state) => {
+          const groupMap = new Map(state.groups.map(group => [group.id, group]))
+          const reorderedGroups = groupIds.map(id => groupMap.get(id)!).filter(Boolean)
+          const unorderedGroups = state.groups.filter(group => !groupIds.includes(group.id))
+          return {
+            groups: [...reorderedGroups, ...unorderedGroups]
+          }
+        }),
       
       setSearchQuery: (searchQuery) => set({ searchQuery }),
       setSelectedGroupId: (selectedGroupId) => set({ selectedGroupId }),

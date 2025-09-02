@@ -85,7 +85,7 @@ export function AddBookmarkModal({ isOpen, onClose, groups }: AddBookmarkModalPr
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {error && (
-            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">
+            <div className="p-3 bg-red-500/20 border border-red-400/50 rounded-md text-sm text-red-300 font-medium">
               {error}
             </div>
           )}

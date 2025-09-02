@@ -141,6 +141,21 @@ async function initializeDatabase(db) {
     // Ignore errors if migration has already been run
   }
 
+  // Run migration for sharing system
+  const fs = require('fs').promises;
+  const path = require('path');
+  
+  try {
+    const migrationPath = path.join(__dirname, 'migrations', '002_sharing_system.sql');
+    const migrationSQL = await fs.readFile(migrationPath, 'utf8');
+    await db.exec(migrationSQL);
+    console.log('Sharing system migration applied');
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.log('Sharing system migration error (may already exist):', error.message);
+    }
+  }
+
   console.log('Database initialized successfully');
 }
 

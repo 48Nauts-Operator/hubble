@@ -25,7 +25,8 @@ Hubble is a modern, self-hosted bookmark dashboard designed for developers and t
 - MCP SDK available for integration
 
 ## 🚨 CRITICAL: Development Environment
-**IMPORTANT**: Always check if the docker container are up and running and health before you tell André the system is ready.
+**IMPORTANT**: Always check if the docker container are up and running and health 
+before you tell Andre the system is ready.
 - Always make sure you deployed the frontend or backend changes
 - Always make sure you update the versioning and new features or fixes in the UI
 

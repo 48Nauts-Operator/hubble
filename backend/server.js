@@ -17,6 +17,8 @@ const bookmarkRoutes = require('./routes/bookmarks');
 const analyticsRoutes = require('./routes/analytics');
 const healthRoutes = require('./routes/health');
 const discoveryRoutes = require('./routes/discovery');
+const backupRoutes = require('./routes/backup');
+const shareRoutes = require('./routes/shares');
 
 // Load environment variables
 require('dotenv').config();
@@ -84,6 +86,8 @@ app.use('/api/bookmarks', bookmarkRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/discovery', discoveryRoutes);
+app.use('/api/backup', backupRoutes);
+app.use('/api', shareRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -96,7 +100,25 @@ app.get('/', (req, res) => {
       bookmarks: '/api/bookmarks',
       analytics: '/api/analytics',
       health: '/api/health',
-      discovery: '/api/discovery'
+      discovery: '/api/discovery',
+      backup: '/api/backup',
+      shares: {
+        admin: {
+          list: 'GET /api/shares',
+          create: 'POST /api/shares',
+          get: 'GET /api/shares/:id',
+          update: 'PUT /api/shares/:id',
+          delete: 'DELETE /api/shares/:id'
+        },
+        public: {
+          access: 'GET /api/public/share/:uid',
+          overlay: {
+            save: 'POST /api/public/share/:uid/overlay',
+            get: 'GET /api/public/share/:uid/overlay/:sessionId',
+            addBookmark: 'POST /api/public/share/:uid/bookmark'
+          }
+        }
+      }
     }
   });
 });
@@ -119,6 +141,27 @@ io.on('connection', (socket) => {
   socket.on('health:check', async (bookmarkId) => {
     // Trigger health check
     socket.emit('health:result', { bookmarkId, status: 'checking' });
+  });
+  
+  // Handle share view updates
+  socket.on('share:join', async (shareUid) => {
+    socket.join(`share:${shareUid}`);
+    console.log(`Client ${socket.id} joined share room: ${shareUid}`);
+  });
+  
+  socket.on('share:leave', async (shareUid) => {
+    socket.leave(`share:${shareUid}`);
+    console.log(`Client ${socket.id} left share room: ${shareUid}`);
+  });
+  
+  // Handle personal overlay updates
+  socket.on('overlay:update', async (data) => {
+    if (data.shareUid) {
+      socket.to(`share:${data.shareUid}`).emit('overlay:updated', {
+        sessionId: data.sessionId,
+        overlay: data.overlay
+      });
+    }
   });
 });
 

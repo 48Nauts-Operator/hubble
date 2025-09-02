@@ -1,10 +1,30 @@
 import { useState } from 'react'
-import { Folder, FolderOpen, Hash, Plus, ChevronRight, ChevronDown, Edit2, Trash2, ChevronLeft } from 'lucide-react'
+import { Folder, FolderOpen, Hash, Plus, ChevronRight, ChevronDown, Edit2, Trash2, ChevronLeft, GripVertical } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useBookmarkStore, type BookmarkGroup } from '@/stores/useBookmarkStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/utils/cn'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import {
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { groupApi } from '@/services/api'
 
 interface GroupSidebarProps {
   onAddGroup?: () => void
@@ -18,9 +38,15 @@ interface GroupItemProps {
   isCollapsed?: boolean
   onEditGroup?: (group: BookmarkGroup) => void
   onDeleteGroup?: (groupId: string) => void
+  isDragging?: boolean
+  isDragOverlay?: boolean
 }
 
-function GroupItem({ group, level = 0, isCollapsed = false, onEditGroup, onDeleteGroup }: GroupItemProps) {
+interface SortableGroupItemProps extends GroupItemProps {
+  id: string
+}
+
+function GroupItem({ group, level = 0, isCollapsed = false, onEditGroup, onDeleteGroup, isDragging = false, isDragOverlay = false }: GroupItemProps) {
   const { selectedGroupId, setSelectedGroupId, getBookmarksByGroup, getSubgroups } = useBookmarkStore()
   const [isExpanded, setIsExpanded] = useState(false)
   const [showActions, setShowActions] = useState(false)
@@ -59,7 +85,9 @@ function GroupItem({ group, level = 0, isCollapsed = false, onEditGroup, onDelet
           isSelected
             ? "backdrop-blur-sm shadow-lg"
             : "hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-100",
-          isCollapsed && "justify-center"
+          isCollapsed && "justify-center",
+          isDragging && "drag-ghost",
+          isDragOverlay && "drag-overlay bg-white dark:bg-slate-800 border-emerald-500/50"
         )}
         style={{ 
           paddingLeft: isCollapsed ? '8px' : `${level * 12 + 12}px`,
@@ -68,12 +96,21 @@ function GroupItem({ group, level = 0, isCollapsed = false, onEditGroup, onDelet
           borderColor: isSelected && group.color ? `${group.color}40` : 'transparent',
           color: isSelected && group.color ? group.color : undefined
         }}
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.99 }}
-        onMouseEnter={() => setShowActions(true)}
+        whileHover={{ scale: isDragging ? 1 : 1.01 }}
+        whileTap={{ scale: isDragging ? 1 : 0.99 }}
+        onMouseEnter={() => !isDragging && setShowActions(true)}
         onMouseLeave={() => setShowActions(false)}
         title={isCollapsed ? `${group.name} (${bookmarkCount})` : undefined}
+        animate={isDragging ? { scale: 0.95, opacity: 0.5 } : { scale: 1, opacity: 1 }}
+        transition={{ duration: 0.2 }}
       >
+        {/* Drag handle for top-level groups when not collapsed */}
+        {level === 0 && !isCollapsed && !isDragOverlay && (
+          <div className="flex-shrink-0 p-1 drag-handle opacity-40 hover:opacity-70 transition-opacity">
+            <GripVertical className="h-3 w-3" />
+          </div>
+        )}
+        
         {/* Expand/Collapse button - hide in collapsed sidebar */}
         {hasSubgroups && !isCollapsed && (
           <button
@@ -174,11 +211,48 @@ function GroupItem({ group, level = 0, isCollapsed = false, onEditGroup, onDelet
   )
 }
 
+function SortableGroupItem({ id, ...props }: SortableGroupItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <div {...listeners} className="touch-none">
+        <GroupItem {...props} isDragging={isDragging} />
+      </div>
+    </div>
+  )
+}
+
 export function GroupSidebar({ onAddGroup, onEditGroup, onDeleteGroup }: GroupSidebarProps) {
-  const { selectedGroupId, setSelectedGroupId, getSubgroups } = useBookmarkStore()
+  const { selectedGroupId, setSelectedGroupId, getSubgroups, reorderGroups } = useBookmarkStore()
   const bookmarks = useBookmarkStore((state) => state.bookmarks)
   const groups = useBookmarkStore((state) => state.groups)
   const { isCollapsed, toggleSidebar } = useSidebarStore()
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [draggedGroup, setDraggedGroup] = useState<BookmarkGroup | null>(null)
+  
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
   
   // Calculate All Bookmarks count (excluding Documentation)
   const documentationGroup = groups.find(g => g.name === 'Documentation')
@@ -188,6 +262,50 @@ export function GroupSidebar({ onAddGroup, onEditGroup, onDeleteGroup }: GroupSi
   
   // Get only top-level groups (no parent)
   const topLevelGroups = getSubgroups(null)
+  
+  const handleDragStart = (event: any) => {
+    const { active } = event
+    setActiveId(active.id)
+    const group = topLevelGroups.find(g => g.id === active.id)
+    setDraggedGroup(group || null)
+  }
+
+  const handleDragEnd = async (event: any) => {
+    const { active, over } = event
+
+    if (active.id !== over?.id) {
+      const oldIndex = topLevelGroups.findIndex(group => group.id === active.id)
+      const newIndex = topLevelGroups.findIndex(group => group.id === over.id)
+      
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newOrder = arrayMove(topLevelGroups, oldIndex, newIndex)
+        const groupIds = newOrder.map(group => group.id)
+        
+        // Update local state immediately for smooth UX
+        reorderGroups(groupIds)
+        
+        // Persist to backend
+        try {
+          const groupsWithOrder = newOrder.map((group, index) => ({
+            id: group.id,
+            sort_order: index
+          }))
+          await groupApi.reorderGroups(groupsWithOrder)
+        } catch (error) {
+          console.error('Failed to reorder groups:', error)
+          // Could add toast notification here for error feedback
+        }
+      }
+    }
+
+    setActiveId(null)
+    setDraggedGroup(null)
+  }
+
+  const handleDragCancel = () => {
+    setActiveId(null)
+    setDraggedGroup(null)
+  }
 
   return (
     <motion.aside
@@ -290,15 +408,42 @@ export function GroupSidebar({ onAddGroup, onEditGroup, onDeleteGroup }: GroupSi
                 </Button>
               </div>
             ) : (
-              topLevelGroups.map((group) => (
-                <GroupItem
-                  key={group.id}
-                  group={group}
-                  isCollapsed={isCollapsed}
-                  onEditGroup={onEditGroup}
-                  onDeleteGroup={onDeleteGroup}
-                />
-              ))
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDragCancel={handleDragCancel}
+              >
+                <SortableContext
+                  items={topLevelGroups.map(g => g.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-1">
+                    {topLevelGroups.map((group) => (
+                      <SortableGroupItem
+                        key={group.id}
+                        id={group.id}
+                        group={group}
+                        isCollapsed={isCollapsed}
+                        onEditGroup={onEditGroup}
+                        onDeleteGroup={onDeleteGroup}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+                <DragOverlay>
+                  {activeId && draggedGroup ? (
+                    <GroupItem
+                      group={draggedGroup}
+                      isCollapsed={isCollapsed}
+                      onEditGroup={onEditGroup}
+                      onDeleteGroup={onDeleteGroup}
+                      isDragOverlay={true}
+                    />
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
             )}
           </div>
         </div>

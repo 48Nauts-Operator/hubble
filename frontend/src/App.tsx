@@ -9,6 +9,8 @@ import { AddGroupModal } from '@/components/AddGroupModal'
 import { EditBookmarkModal } from '@/components/EditBookmarkModal'
 import { EditGroupModal } from '@/components/EditGroupModal'
 import { DiscoveryPanel } from '@/components/DiscoveryPanel'
+import { SettingsModal } from '@/components/SettingsModal'
+import { ShareManager } from '@/components/shares/ShareManager'
 import { useBookmarkStore, type Bookmark, type BookmarkGroup } from '@/stores/useBookmarkStore'
 import { useThemeStore } from '@/stores/useThemeStore'
 import { useViewStore } from '@/stores/useViewStore'
@@ -28,6 +30,8 @@ function App() {
   const [showEditGroupModal, setShowEditGroupModal] = useState(false)
   const [editingGroup, setEditingGroup] = useState<BookmarkGroup | null>(null)
   const [showDiscoveryPanel, setShowDiscoveryPanel] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [showShareManager, setShowShareManager] = useState(false)
 
   // Store hooks
   const {
@@ -216,6 +220,8 @@ function App() {
         onAddBookmark={handleAddBookmark}
         onAddGroup={handleAddGroup}
         onDiscover={handleDiscover}
+        onSettings={() => setShowSettingsModal(true)}
+        onShare={() => setShowShareManager(true)}
       />
 
       <div className="flex">
@@ -399,6 +405,18 @@ function App() {
           setEditingGroup(null)
         }}
         group={editingGroup}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+      />
+
+      {/* Share Manager */}
+      <ShareManager
+        isOpen={showShareManager}
+        onClose={() => setShowShareManager(false)}
       />
     </div>
   )

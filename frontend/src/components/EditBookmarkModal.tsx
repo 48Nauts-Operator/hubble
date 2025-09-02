@@ -19,7 +19,7 @@ interface EditBookmarkModalProps {
 
 export function EditBookmarkModal({ isOpen, onClose, bookmark, groups }: EditBookmarkModalProps) {
   const [title, setTitle] = useState('')
-  const [url, setUrl] = useState('')
+  const [externalUrl, setExternalUrl] = useState('')
   const [internalUrl, setInternalUrl] = useState('')
   const [description, setDescription] = useState('')
   const [groupId, setGroupId] = useState<string>('')
@@ -35,7 +35,7 @@ export function EditBookmarkModal({ isOpen, onClose, bookmark, groups }: EditBoo
   useEffect(() => {
     if (bookmark) {
       setTitle(bookmark.title || '')
-      setUrl(bookmark.url || '')
+      setExternalUrl(bookmark.externalUrl || bookmark.url || '')
       setInternalUrl(bookmark.internalUrl || '')
       setDescription(bookmark.description || '')
       setGroupId(bookmark.groupId || '')
@@ -53,22 +53,31 @@ export function EditBookmarkModal({ isOpen, onClose, bookmark, groups }: EditBoo
     setError(null)
     
     try {
-      const updatedBookmark = await bookmarkApi.updateBookmark(bookmark.id, {
+      const updateData: any = {
         title: title.trim(),
-        url: url.trim(),
-        internalUrl: internalUrl.trim() || undefined,
         description: description.trim() || undefined,
         groupId: groupId || undefined,
         tags: tags.split(',').map(t => t.trim()).filter(Boolean),
         icon: icon.trim() || undefined,
         environment: environment
-      })
+      }
+      
+      // Handle URL fields - external URL is the primary URL
+      if (externalUrl.trim()) {
+        updateData.url = externalUrl.trim()
+        updateData.externalUrl = externalUrl.trim()
+      }
+      if (internalUrl.trim()) {
+        updateData.internalUrl = internalUrl.trim()
+      }
+      
+      const updatedBookmark = await bookmarkApi.updateBookmark(bookmark.id, updateData)
       
       updateBookmark(bookmark.id, updatedBookmark)
       onClose()
-    } catch (err) {
-      console.error('Failed to update bookmark:', err)
-      setError('Failed to update bookmark. Please try again.')
+    } catch (err: any) {
+      const errorMessage = err.message || err.error || 'Failed to update bookmark. Please try again.'
+      setError(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -117,7 +126,7 @@ export function EditBookmarkModal({ isOpen, onClose, bookmark, groups }: EditBoo
             <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
               <div className="p-6 space-y-4 overflow-y-auto flex-1">
                 {error && (
-                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
+                  <div className="p-3 bg-red-500/20 border border-red-400/50 rounded-lg text-sm text-red-300 font-medium">
                     {error}
                   </div>
                 )}
@@ -134,12 +143,12 @@ export function EditBookmarkModal({ isOpen, onClose, bookmark, groups }: EditBoo
                 </div>
                 
                 <div className="space-y-2">
-                  <label htmlFor="url" className="text-sm font-medium">External URL *</label>
+                  <label htmlFor="externalUrl" className="text-sm font-medium">External URL *</label>
                   <Input
-                    id="url"
+                    id="externalUrl"
                     type="url"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
+                    value={externalUrl}
+                    onChange={(e) => setExternalUrl(e.target.value)}
                     placeholder="https://example.com"
                     required
                   />
