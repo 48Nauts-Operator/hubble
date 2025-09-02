@@ -99,28 +99,37 @@ export function SharedView() {
       const response = await shareApi.getPublicShare(uid)
       
       // Transform the response
+      const share = response.share
       const transformedData: SharedViewData = {
-        uid: response.uid,
-        name: response.name,
-        description: response.description,
-        isPublic: response.access_type === 'public',
+        uid: share.uid,
+        name: share.name,
+        description: share.description,
+        isPublic: share.access_type === 'public',
         permissions: {
-          canAdd: response.permissions?.canAddBookmarks || false,
-          canEdit: response.permissions?.canEditBookmarks || false,
-          canDelete: response.permissions?.canDeleteBookmarks || false
+          canAdd: share.permissions?.canAddBookmarks || false,
+          canEdit: share.permissions?.canEditBookmarks || false,
+          canDelete: share.permissions?.canDeleteBookmarks || false
         },
         appearance: {
-          theme: response.theme || 'system',
-          title: response.branding?.title || response.name,
-          description: response.branding?.subtitle || response.description,
-          showDescription: response.show_description !== false,
-          showTags: response.show_tags !== false,
-          showEnvironment: response.show_environment !== false
+          theme: share.theme || 'system',
+          title: share.branding?.title || share.name,
+          description: share.branding?.subtitle || share.description,
+          showDescription: share.show_description !== false,
+          showTags: share.show_tags !== false,
+          showEnvironment: share.show_environment !== false
         },
-        bookmarks: response.bookmarks || [],
+        bookmarks: (response.bookmarks || []).map((bookmark: any) => ({
+          ...bookmark,
+          tags: typeof bookmark.tags === 'string' ? JSON.parse(bookmark.tags || '[]') : (bookmark.tags || []),
+          group: bookmark.group_name ? {
+            id: bookmark.group_id,
+            name: bookmark.group_name,
+            color: bookmark.group_color
+          } : undefined
+        })),
         groups: response.groups || [],
-        expiresAt: response.expires_at ? new Date(response.expires_at) : undefined,
-        createdBy: response.created_by
+        expiresAt: share.expires_at ? new Date(share.expires_at) : undefined,
+        createdBy: share.created_by
       }
 
       setViewData(transformedData)
