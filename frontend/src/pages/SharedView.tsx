@@ -2,14 +2,13 @@
 // ABOUTME: Displays bookmarks from a shared link with optional personal overlay support
 
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
   Globe, 
   Lock, 
   AlertCircle, 
   RefreshCw,
-  Home,
   ExternalLink,
   Search,
   Grid,
@@ -68,7 +67,6 @@ interface SharedViewData {
 
 export function SharedView() {
   const { uid } = useParams<{ uid: string }>()
-  const navigate = useNavigate()
   const [viewData, setViewData] = useState<SharedViewData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -203,12 +201,12 @@ export function SharedView() {
               <h2 className="text-xl font-semibold mb-2">Unable to Load Share</h2>
               <p className="text-muted-foreground mb-6">{error}</p>
               <Button
-                onClick={() => navigate('/')}
+                onClick={() => window.location.reload()}
                 variant="outline"
                 className="flex items-center gap-2"
               >
-                <Home className="h-4 w-4" />
-                Go to Homepage
+                <RefreshCw className="h-4 w-4" />
+                Refresh Page
               </Button>
             </CardContent>
           </Card>
@@ -281,17 +279,6 @@ export function SharedView() {
                   <List className="h-4 w-4" />
                 </Button>
               </div>
-
-              {/* Home Link */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate('/')}
-                className="flex items-center gap-2"
-              >
-                <Home className="h-4 w-4" />
-                Home
-              </Button>
             </div>
           </div>
         </div>
@@ -446,7 +433,7 @@ export function SharedView() {
       <footer className="mt-auto border-t border-border py-4">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
           Shared by {viewData.createdBy || 'Anonymous'} • 
-          Powered by <a href="/" className="hover:text-foreground">Hubble</a>
+          Powered by Hubble
         </div>
       </footer>
     </div>
