@@ -18,7 +18,8 @@ const analyticsRoutes = require('./routes/analytics');
 const healthRoutes = require('./routes/health');
 const discoveryRoutes = require('./routes/discovery');
 const backupRoutes = require('./routes/backup');
-const shareRoutes = require('./routes/shares');
+const shareAdminRoutes = require('./routes/shares-admin');
+const sharePublicRoutes = require('./routes/shares-public');
 const authRoutes = require('./routes/auth');
 
 // Import middleware
@@ -88,7 +89,10 @@ app.use((req, res, next) => {
 // Auth routes (no middleware needed - handles its own auth)
 app.use('/api/auth', authRoutes);
 
-// Apply auth middleware to all other routes
+// Public share routes (no auth required)
+app.use('/api/public', sharePublicRoutes);
+
+// Apply auth middleware to all protected routes
 app.use(authMiddleware);
 
 // Protected API Routes
@@ -98,7 +102,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/discovery', discoveryRoutes);
 app.use('/api/backup', backupRoutes);
-app.use('/api', shareRoutes);
+app.use('/api/shares', shareAdminRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

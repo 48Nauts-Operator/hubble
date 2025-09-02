@@ -2,6 +2,7 @@
 // ABOUTME: Provides functions for creating, reading, updating, and deleting shared views
 
 import { ApiError } from './api'
+import { authService } from './authApi'
 
 // Use relative URL for production, localhost for development
 const API_BASE_URL = window.location.hostname === 'localhost' 
@@ -69,6 +70,11 @@ export interface UpdateShareRequest extends Partial<CreateShareRequest> {}
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
+    // If 401, clear token and redirect to login
+    if (response.status === 401) {
+      authService.clearToken()
+      window.location.href = '/login'
+    }
     const errorText = await response.text()
     throw new ApiError(response.status, errorText || `HTTP error! status: ${response.status}`)
   }
@@ -178,7 +184,9 @@ function transformShareForBackend(share: CreateShareRequest | UpdateShareRequest
 
 export const shareApi = {
   async getAllShares(): Promise<SharedView[]> {
-    const response = await fetch(`${API_BASE_URL}/shares`)
+    const response = await fetch(`${API_BASE_URL}/shares`, {
+      headers: authService.getAuthHeaders()
+    })
     const data = await handleResponse<any>(response)
     // Handle both array and object with shares property
     const shares = Array.isArray(data) ? data : (data.shares || [])
@@ -188,7 +196,7 @@ export const shareApi = {
   async createShare(share: CreateShareRequest): Promise<SharedView> {
     const response = await fetch(`${API_BASE_URL}/shares`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authService.getAuthHeaders(),
       body: JSON.stringify(transformShareForBackend(share))
     })
     const data = await handleResponse<any>(response)
@@ -196,7 +204,9 @@ export const shareApi = {
   },
 
   async getShare(id: string): Promise<SharedView> {
-    const response = await fetch(`${API_BASE_URL}/shares/${id}`)
+    const response = await fetch(`${API_BASE_URL}/shares/${id}`, {
+      headers: authService.getAuthHeaders()
+    })
     const data = await handleResponse<any>(response)
     return transformShare(data)
   },
@@ -204,7 +214,7 @@ export const shareApi = {
   async updateShare(id: string, share: UpdateShareRequest): Promise<SharedView> {
     const response = await fetch(`${API_BASE_URL}/shares/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authService.getAuthHeaders(),
       body: JSON.stringify(transformShareForBackend(share))
     })
     const data = await handleResponse<any>(response)
@@ -213,7 +223,8 @@ export const shareApi = {
 
   async deleteShare(id: string): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/shares/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: authService.getAuthHeaders()
     })
     if (!response.ok) {
       throw new ApiError(response.status, `HTTP error! status: ${response.status}`)
@@ -232,7 +243,9 @@ export const shareApi = {
     lastAccessed?: Date
     dailyViews: { date: string; views: number }[]
   }> {
-    const response = await fetch(`${API_BASE_URL}/shares/${id}/analytics`)
+    const response = await fetch(`${API_BASE_URL}/shares/${id}/analytics`, {
+      headers: authService.getAuthHeaders()
+    })
     const data = await handleResponse<any>(response)
     return {
       ...data,

@@ -1,6 +1,8 @@
 // ABOUTME: API client for Docker discovery service
 // ABOUTME: Handles scanning, preview, and importing of discovered containers
 
+import { authService } from './authApi'
+
 // Note: ApiResponse type will be defined inline
 
 interface ApiResponse {
@@ -109,12 +111,18 @@ class DiscoveryApi {
       const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
+          ...authService.getAuthHeaders(),
           ...options?.headers,
         },
         ...options,
       });
 
       if (!response.ok) {
+        // If 401, clear token and redirect to login
+        if (response.status === 401) {
+          authService.clearToken()
+          window.location.href = '/login'
+        }
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP ${response.status}`);
       }

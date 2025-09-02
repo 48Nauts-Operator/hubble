@@ -240,4 +240,4 @@ export const mcpApi = {
   }
 }
 
-export { ApiError }
+// ApiError is already exported above

@@ -12,7 +12,7 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
-  const [authEnabled, setAuthEnabled] = useState(true)
+  const [, setAuthEnabled] = useState(true)
 
   useEffect(() => {
     checkAuth()

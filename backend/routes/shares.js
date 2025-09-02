@@ -74,7 +74,7 @@ async function checkAccessibility(db, sharedView) {
 // PUBLIC ACCESS ENDPOINTS (no authentication required) - These must come FIRST
 
 // GET /api/public/share/:uid - Access shared view by public UID
-router.get('/public/share/:uid',
+router.get('/share/:uid',
   param('uid').isLength({ min: 8, max: 8 }),
   handleValidationErrors,
   async (req, res, next) => {
@@ -182,7 +182,7 @@ router.get('/public/share/:uid',
 );
 
 // POST /api/public/share/:uid/overlay - Save personal overlay
-router.post('/public/share/:uid/overlay',
+router.post('/share/:uid/overlay',
   param('uid').isLength({ min: 8, max: 8 }),
   body('session_id').notEmpty().trim(),
   body('personal_bookmarks').optional().isArray(),
@@ -279,7 +279,7 @@ router.post('/public/share/:uid/overlay',
 );
 
 // GET /api/public/share/:uid/overlay/:sessionId - Get personal overlay
-router.get('/public/share/:uid/overlay/:sessionId',
+router.get('/share/:uid/overlay/:sessionId',
   param('uid').isLength({ min: 8, max: 8 }),
   param('sessionId').notEmpty(),
   handleValidationErrors,
@@ -318,7 +318,7 @@ router.get('/public/share/:uid/overlay/:sessionId',
 );
 
 // POST /api/public/share/:uid/bookmark - Add personal bookmark to overlay
-router.post('/public/share/:uid/bookmark',
+router.post('/share/:uid/bookmark',
   param('uid').isLength({ min: 8, max: 8 }),
   body('session_id').notEmpty().trim(),
   body('title').notEmpty().trim(),
@@ -411,7 +411,7 @@ router.post('/public/share/:uid/bookmark',
 // ADMIN ENDPOINTS (require authentication in production)
 
 // GET /api/shares - List all shared views
-router.get('/shares',
+router.get('/',
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('offset').optional().isInt({ min: 0 }),
   handleValidationErrors,
@@ -455,7 +455,7 @@ router.get('/shares',
 );
 
 // POST /api/shares - Create new shared view
-router.post('/shares',
+router.post('/',
   body('name').notEmpty().trim().isLength({ max: 255 }),
   body('description').optional().trim(),
   body('access_type').optional().isIn(['public', 'restricted', 'expiring']),
@@ -556,7 +556,7 @@ router.post('/shares',
 );
 
 // GET /api/shares/:id - Get specific shared view (by internal ID)
-router.get('/shares/:id',
+router.get('/:id',
   param('id').notEmpty(),
   handleValidationErrors,
   async (req, res, next) => {
@@ -603,7 +603,7 @@ router.get('/shares/:id',
 );
 
 // PUT /api/shares/:id - Update shared view
-router.put('/shares/:id',
+router.put('/:id',
   param('id').notEmpty(),
   body('name').optional().trim().isLength({ max: 255 }),
   body('description').optional().trim(),
@@ -698,7 +698,7 @@ router.put('/shares/:id',
 );
 
 // DELETE /api/shares/:id - Delete shared view
-router.delete('/shares/:id',
+router.delete('/:id',
   param('id').notEmpty(),
   handleValidationErrors,
   async (req, res, next) => {
