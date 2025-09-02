@@ -1,4 +1,5 @@
 import type { Bookmark, BookmarkGroup } from '@/stores/useBookmarkStore'
+import { authService } from './authApi'
 
 // Use relative URL for production, localhost for development
 const API_BASE_URL = window.location.hostname === 'localhost' 
@@ -8,7 +9,7 @@ const MCP_BASE_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:9900'
   : '/mcp'
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message)
     this.name = 'ApiError'
@@ -17,9 +18,19 @@ class ApiError extends Error {
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
+    // If 401, clear token and redirect to login
+    if (response.status === 401) {
+      authService.clearToken()
+      window.location.href = '/login'
+    }
     throw new ApiError(response.status, `HTTP error! status: ${response.status}`)
   }
   return response.json()
+}
+
+// Get headers with auth token
+function getHeaders(): HeadersInit {
+  return authService.getAuthHeaders()
 }
 
 // Transform backend bookmark data to frontend format
@@ -65,7 +76,9 @@ function transformGroup(backendGroup: any): BookmarkGroup {
 // Bookmark API
 export const bookmarkApi = {
   async getAllBookmarks(): Promise<Bookmark[]> {
-    const response = await fetch(`${API_BASE_URL}/bookmarks`)
+    const response = await fetch(`${API_BASE_URL}/bookmarks`, {
+      headers: getHeaders()
+    })
     const data = await handleResponse<{ bookmarks: any[] } | any[]>(response)
     // Handle both paginated response and direct array
     const bookmarksData = Array.isArray(data) ? data : (data.bookmarks || [])
@@ -89,7 +102,7 @@ export const bookmarkApi = {
     
     const response = await fetch(`${API_BASE_URL}/bookmarks`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify(backendBookmark)
     })
     const data = await handleResponse<any>(response)
@@ -115,7 +128,7 @@ export const bookmarkApi = {
     
     const response = await fetch(`${API_BASE_URL}/bookmarks/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify(backendBookmark)
     })
     const data = await handleResponse<any>(response)
@@ -124,7 +137,8 @@ export const bookmarkApi = {
 
   async deleteBookmark(id: string): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/bookmarks/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getHeaders()
     })
     if (!response.ok) {
       throw new ApiError(response.status, `HTTP error! status: ${response.status}`)
@@ -132,7 +146,9 @@ export const bookmarkApi = {
   },
 
   async searchBookmarks(query: string): Promise<Bookmark[]> {
-    const response = await fetch(`${API_BASE_URL}/bookmarks/search?q=${encodeURIComponent(query)}`)
+    const response = await fetch(`${API_BASE_URL}/bookmarks/search?q=${encodeURIComponent(query)}`, {
+      headers: getHeaders()
+    })
     const data = await handleResponse<any[]>(response)
     return data.map(transformBookmark)
   }
@@ -141,7 +157,9 @@ export const bookmarkApi = {
 // Group API
 export const groupApi = {
   async getAllGroups(): Promise<BookmarkGroup[]> {
-    const response = await fetch(`${API_BASE_URL}/groups`)
+    const response = await fetch(`${API_BASE_URL}/groups`, {
+      headers: getHeaders()
+    })
     const data = await handleResponse<any[]>(response)
     return data.map(transformGroup)
   },
@@ -159,7 +177,7 @@ export const groupApi = {
     
     const response = await fetch(`${API_BASE_URL}/groups`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify(backendGroup)
     })
     const data = await handleResponse<any>(response)
@@ -177,7 +195,7 @@ export const groupApi = {
     
     const response = await fetch(`${API_BASE_URL}/groups/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify(backendGroup)
     })
     const data = await handleResponse<any>(response)
@@ -186,7 +204,8 @@ export const groupApi = {
 
   async deleteGroup(id: string): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/groups/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getHeaders()
     })
     if (!response.ok) {
       throw new ApiError(response.status, `HTTP error! status: ${response.status}`)
@@ -196,7 +215,7 @@ export const groupApi = {
   async reorderGroups(groups: { id: string; sort_order: number }[]): Promise<BookmarkGroup[]> {
     const response = await fetch(`${API_BASE_URL}/groups/reorder`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify({ groups })
     })
     const data = await handleResponse<any[]>(response)

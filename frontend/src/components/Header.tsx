@@ -1,9 +1,11 @@
-import { Search, Moon, Sun, Plus, Container, LayoutGrid, List, Settings, Share2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Search, Moon, Sun, Plus, Container, LayoutGrid, List, Settings, Share2, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useBookmarkStore } from '@/stores/useBookmarkStore'
 import { useThemeStore } from '@/stores/useThemeStore'
 import { useViewStore } from '@/stores/useViewStore'
+import { authService } from '@/services/authApi'
 import { motion } from 'framer-motion'
 
 interface HeaderProps {
@@ -15,9 +17,15 @@ interface HeaderProps {
 }
 
 export function Header({ onAddBookmark, onAddGroup, onDiscover, onSettings, onShare }: HeaderProps) {
+  const navigate = useNavigate()
   const { searchQuery, setSearchQuery } = useBookmarkStore()
   const { isDarkMode, toggleTheme } = useThemeStore()
   const { viewMode, toggleViewMode } = useViewStore()
+  
+  const handleLogout = async () => {
+    await authService.logout()
+    navigate('/login')
+  }
 
   return (
     <motion.header 
@@ -142,6 +150,19 @@ export function Header({ onAddBookmark, onAddGroup, onDiscover, onSettings, onSh
               )}
             </motion.div>
           </Button>
+
+          {/* Logout Button - only show if auth is enabled */}
+          {authService.isAuthenticated() && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleLogout}
+              className="hover:text-red-500 dark:hover:text-red-400"
+              title="Logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
     </motion.header>

@@ -19,6 +19,10 @@ const healthRoutes = require('./routes/health');
 const discoveryRoutes = require('./routes/discovery');
 const backupRoutes = require('./routes/backup');
 const shareRoutes = require('./routes/shares');
+const authRoutes = require('./routes/auth');
+
+// Import middleware
+const authMiddleware = require('./middleware/auth');
 
 // Load environment variables
 require('dotenv').config();
@@ -73,14 +77,21 @@ async function initializeDb() {
   }
 }
 
-// Make database available to routes
+// Make database and io available to routes
 app.use((req, res, next) => {
   req.db = db;
   req.io = io;
+  global.db = db; // Make db available for auth cleanup
   next();
 });
 
-// API Routes
+// Auth routes (no middleware needed - handles its own auth)
+app.use('/api/auth', authRoutes);
+
+// Apply auth middleware to all other routes
+app.use(authMiddleware);
+
+// Protected API Routes
 app.use('/api/groups', groupRoutes);
 app.use('/api/bookmarks', bookmarkRoutes);
 app.use('/api/analytics', analyticsRoutes);
