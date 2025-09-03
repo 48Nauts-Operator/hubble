@@ -47,6 +47,12 @@ jobs:
         run: |
           pip install anthropic PyGithub pyyaml
       
+      - name: Debug file existence
+        run: |
+          pwd
+          ls -la .github/scripts/
+          file .github/scripts/claude_review.py
+      
       - name: Run Claude Codebase Review
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
