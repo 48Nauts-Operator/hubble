@@ -27,6 +27,25 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
+// CSRF protection for state-changing operations
+const csrfProtection = (req, res, next) => {
+  // Skip CSRF for GET requests (they should be idempotent)
+  if (req.method === 'GET') {
+    return next();
+  }
+
+  // Check for custom header that proves this is a programmatic request
+  const customHeader = req.headers['x-requested-with'];
+  if (!customHeader || customHeader !== 'XMLHttpRequest') {
+    return res.status(403).json({ 
+      error: 'CSRF protection: Missing required header',
+      message: 'This request must include the X-Requested-With header'
+    });
+  }
+
+  next();
+};
+
 // Check if auth is enabled
 function isAuthEnabled() {
   return process.env.AUTH_ENABLED !== 'false';
@@ -59,6 +78,7 @@ router.get('/status', async (req, res, next) => {
 
 // POST /api/auth/setup - First-time setup
 router.post('/setup',
+  csrfProtection,
   body('password')
     .isLength({ min: 8 })
     .withMessage('Password must be at least 8 characters')
@@ -111,6 +131,7 @@ router.post('/setup',
 
 // POST /api/auth/login - Login endpoint
 router.post('/login',
+  csrfProtection,
   body('password').notEmpty(),
   body('remember').optional().isBoolean(),
   handleValidationErrors,
@@ -198,7 +219,7 @@ router.post('/login',
 );
 
 // POST /api/auth/logout - Logout endpoint
-router.post('/logout', async (req, res, next) => {
+router.post('/logout', csrfProtection, async (req, res, next) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) {
@@ -216,7 +237,7 @@ router.post('/logout', async (req, res, next) => {
 });
 
 // POST /api/auth/verify - Verify current token
-router.post('/verify', async (req, res, next) => {
+router.post('/verify', csrfProtection, async (req, res, next) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) {

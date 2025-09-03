@@ -15,19 +15,22 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-// Generate unique 8-character UID for public sharing
+// Generate unique 8-character UID for public sharing using cryptographically secure random
 function generateShareUID() {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   let result = '';
+  const randomBytes = crypto.randomBytes(8);
+  
   for (let i = 0; i < 8; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += chars.charAt(randomBytes[i] % chars.length);
   }
   return result;
 }
 
-// Generate unique ID for database records
+// Generate unique ID for database records using cryptographically secure random
 function generateId(prefix = '') {
-  return prefix + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  const randomHex = crypto.randomBytes(6).toString('hex');
+  return prefix + Date.now() + '-' + randomHex;
 }
 
 // GET /api/shares - List all shared views

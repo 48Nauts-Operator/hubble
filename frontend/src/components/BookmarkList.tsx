@@ -17,6 +17,7 @@ import {
 import { useBookmarkStore, type Bookmark } from '@/stores/useBookmarkStore'
 import { cn } from '@/utils/cn'
 import { getEnhancedFaviconUrl, getBrandColors } from '@/utils/brandDetection'
+import { stripHtml } from '@/utils/sanitize'
 
 interface BookmarkListProps {
   bookmarks: Bookmark[]
@@ -220,7 +221,7 @@ function BookmarkRow({ bookmark, onEdit, onDelete }: BookmarkRowProps) {
               {/* Description */}
               {bookmark.description && (
                 <p className="text-sm text-muted-foreground">
-                  {bookmark.description}
+                  {stripHtml(bookmark.description)}
                 </p>
               )}
               

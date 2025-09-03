@@ -20,6 +20,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { shareApi } from '@/services/shareApi'
+import { stripHtml } from '@/utils/sanitize'
 
 interface SharedBookmark {
   id: string
@@ -381,7 +382,7 @@ export function SharedView() {
                         
                         {viewData.appearance.showDescription && bookmark.description && (
                           <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                            {bookmark.description}
+                            {stripHtml(bookmark.description)}
                           </p>
                         )}
 

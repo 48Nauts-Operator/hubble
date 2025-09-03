@@ -5,6 +5,7 @@ const express = require('express');
 const router = express.Router();
 const { body, param, query, validationResult } = require('express-validator');
 const crypto = require('crypto');
+const { authMiddleware, checkResourceOwnership, requireAdmin } = require('../middleware/auth');
 
 // Validation middleware
 const handleValidationErrors = (req, res, next) => {
@@ -412,6 +413,8 @@ router.post('/share/:uid/bookmark',
 
 // GET /api/shares - List all shared views
 router.get('/',
+  authMiddleware,
+  requireAdmin,
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('offset').optional().isInt({ min: 0 }),
   handleValidationErrors,
@@ -456,6 +459,8 @@ router.get('/',
 
 // POST /api/shares - Create new shared view
 router.post('/',
+  authMiddleware,
+  requireAdmin,
   body('name').notEmpty().trim().isLength({ max: 255 }),
   body('description').optional().trim(),
   body('access_type').optional().isIn(['public', 'restricted', 'expiring']),
@@ -557,7 +562,10 @@ router.post('/',
 
 // GET /api/shares/:id - Get specific shared view (by internal ID)
 router.get('/:id',
-  param('id').notEmpty(),
+  authMiddleware,
+  requireAdmin,
+  param('id').notEmpty().withMessage('Share ID is required'),
+  checkResourceOwnership('shared_view'),
   handleValidationErrors,
   async (req, res, next) => {
     try {
@@ -604,7 +612,10 @@ router.get('/:id',
 
 // PUT /api/shares/:id - Update shared view
 router.put('/:id',
-  param('id').notEmpty(),
+  authMiddleware,
+  requireAdmin,
+  param('id').notEmpty().withMessage('Share ID is required'),
+  checkResourceOwnership('shared_view'),
   body('name').optional().trim().isLength({ max: 255 }),
   body('description').optional().trim(),
   body('access_type').optional().isIn(['public', 'restricted', 'expiring']),
@@ -699,17 +710,18 @@ router.put('/:id',
 
 // DELETE /api/shares/:id - Delete shared view
 router.delete('/:id',
-  param('id').notEmpty(),
+  authMiddleware,
+  requireAdmin,
+  param('id').notEmpty().withMessage('Share ID is required'),
+  checkResourceOwnership('shared_view'),
   handleValidationErrors,
   async (req, res, next) => {
     try {
       const { id } = req.params;
       
-      const existing = await req.db.get('SELECT * FROM shared_views WHERE id = ?', [id]);
-      if (!existing) {
-        return res.status(404).json({ error: 'Shared view not found' });
-      }
-
+      // Resource ownership already verified by checkResourceOwnership middleware
+      // req.resource contains the validated resource
+      
       await req.db.run('DELETE FROM shared_views WHERE id = ?', [id]);
 
       // Emit WebSocket event

@@ -56,15 +56,16 @@ class AuthService {
 
   // Get auth headers for API requests
   getAuthHeaders(): HeadersInit {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+
     if (this.token) {
-      return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.token}`
-      }
+      headers['Authorization'] = `Bearer ${this.token}`
     }
-    return {
-      'Content-Type': 'application/json'
-    }
+
+    return headers
   }
 
   // Check auth status (enabled/configured)
