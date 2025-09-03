@@ -19,7 +19,7 @@ class ClaudeCodebaseReviewer:
         self.anthropic_key = os.environ.get('ANTHROPIC_API_KEY')
         self.github_token = os.environ.get('GITHUB_TOKEN')
         self.review_type = os.environ.get('REVIEW_TYPE', 'comprehensive')
-        self.repo_name = os.environ.get('GITHUB_REPOSITORY', '48Nauts-Operator/nexus-protocol')
+        self.repo_name = os.environ.get('GITHUB_REPOSITORY', '48Nauts-Operator/hubble')
         
         if not self.anthropic_key:
             raise ValueError("ANTHROPIC_API_KEY not set")
