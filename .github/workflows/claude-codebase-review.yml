@@ -1,0 +1,69 @@
+name: Claude Codebase Review
+
+on:
+  # Manual trigger with workflow_dispatch
+  workflow_dispatch:
+    inputs:
+      review_type:
+        description: 'Type of review to perform'
+        required: true
+        default: 'comprehensive'
+        type: choice
+        options:
+          - comprehensive
+          - security
+          - performance
+          - architecture
+          - bugs
+      
+  # Schedule weekly reviews (optional - every Sunday at 2 AM)
+  schedule:
+    - cron: '0 2 * * 0'
+  
+  # Or trigger on push to main (optional)
+  # push:
+  #   branches: [main]
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+      pull-requests: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get full history for better analysis
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          pip install anthropic PyGithub pyyaml
+      
+      - name: Run Claude Codebase Review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_TYPE: ${{ github.event.inputs.review_type || 'comprehensive' }}
+        run: |
+          python .github/scripts/claude_review.py
+      
+      - name: Create Review Summary
+        if: always()
+        run: |
+          echo "## 🤖 Claude Code Review Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Review Type: ${{ github.event.inputs.review_type || 'comprehensive' }}" >> $GITHUB_STEP_SUMMARY
+          echo "Repository: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f review_summary.md ]; then
+            cat review_summary.md >> $GITHUB_STEP_SUMMARY
+          fi
