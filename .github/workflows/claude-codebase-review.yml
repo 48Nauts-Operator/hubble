@@ -59,6 +59,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REVIEW_TYPE: ${{ github.event.inputs.review_type || 'comprehensive' }}
         run: |
+          # Force refresh - use python3 explicitly
           python3 .github/scripts/claude_review.py
       
       - name: Create Review Summary
