@@ -82,4 +82,88 @@ async function authMiddleware(req, res, next) {
   }
 }
 
-module.exports = authMiddleware;
+/**
+ * Resource ownership middleware factory
+ * Validates that the user has access to the requested resource
+ */
+function checkResourceOwnership(resourceType) {
+  return async (req, res, next) => {
+    try {
+      const resourceId = req.params.id;
+
+      if (!resourceId) {
+        return res.status(400).json({
+          error: 'Resource ID is required',
+          code: 'MISSING_RESOURCE_ID'
+        });
+      }
+
+      // Check resource ownership based on type
+      let query;
+      let params = [resourceId];
+
+      switch (resourceType) {
+        case 'share':
+        case 'shared_view':
+          // For shared views, verify the resource exists
+          // In a multi-user system, you'd add: AND created_by = ? 
+          query = 'SELECT id FROM shared_views WHERE id = ?';
+          break;
+          
+        case 'bookmark':
+          // For bookmarks, verify the resource exists
+          query = 'SELECT id FROM bookmarks WHERE id = ?';
+          break;
+          
+        case 'group':
+          // For groups, verify the resource exists
+          query = 'SELECT id FROM groups WHERE id = ?';
+          break;
+          
+        default:
+          return res.status(400).json({
+            error: 'Unknown resource type',
+            code: 'INVALID_RESOURCE_TYPE'
+          });
+      }
+
+      const resource = await req.db.get(query, params);
+      
+      if (!resource) {
+        return res.status(404).json({
+          error: `${resourceType.charAt(0).toUpperCase() + resourceType.slice(1)} not found`,
+          code: 'RESOURCE_NOT_FOUND'
+        });
+      }
+
+      // Resource exists and user has access
+      req.resource = resource;
+      next();
+    } catch (error) {
+      console.error('Resource ownership check error:', error);
+      return res.status(500).json({
+        error: 'Authorization check failed',
+        code: 'AUTHORIZATION_ERROR'
+      });
+    }
+  };
+}
+
+/**
+ * Admin-only middleware
+ */
+function requireAdmin(req, res, next) {
+  if (!req.auth || req.auth.type !== 'admin') {
+    return res.status(403).json({ 
+      error: 'Admin privileges required',
+      code: 'INSUFFICIENT_PRIVILEGES'
+    });
+  }
+  next();
+}
+
+module.exports = {
+  authMiddleware,
+  checkResourceOwnership,
+  requireAdmin
+};

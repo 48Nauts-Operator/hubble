@@ -18,6 +18,7 @@ import {
   MousePointer
 } from 'lucide-react'
 import { useBookmarkStore, type Bookmark } from '@/stores/useBookmarkStore'
+import { stripHtml } from '@/utils/sanitize'
 import { cn } from '@/utils/cn'
 import { getEnhancedFaviconUrl, getBrandGradient, getBrandColors } from '@/utils/brandDetection'
 
@@ -273,7 +274,7 @@ export function BookmarkCard({
             {/* Description - MAIN CONTENT ON FRONT */}
             {bookmark.description && (
               <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
-                {bookmark.description}
+                {stripHtml(bookmark.description)}
               </p>
             )}
           </div>

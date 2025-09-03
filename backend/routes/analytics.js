@@ -101,34 +101,46 @@ router.get('/bookmark/:id', async (req, res, next) => {
 // GET /api/analytics/trends - Get usage trends
 router.get('/trends', async (req, res, next) => {
   try {
-    const { days = 7 } = req.query;
+    let { days = 7 } = req.query;
     
-    // Daily clicks
+    // Validate and sanitize days parameter
+    days = parseInt(days);
+    if (isNaN(days) || days < 1 || days > 365) {
+      return res.status(400).json({ error: 'Invalid days parameter. Must be between 1 and 365.' });
+    }
+    
+    // Build the date threshold using parameterized query
+    const dateThreshold = `datetime('now', '-${days} days')`;
+    
+    // Daily clicks - using safe parameterized approach
     const dailyClicks = await req.db.all(
       `SELECT DATE(timestamp) as date, COUNT(*) as clicks 
        FROM analytics 
        WHERE event_type = 'click' 
-       AND timestamp >= datetime('now', '-${days} days')
+       AND timestamp >= datetime('now', '-' || ? || ' days')
        GROUP BY DATE(timestamp)
-       ORDER BY date ASC`
+       ORDER BY date ASC`,
+      [days]
     );
     
-    // New bookmarks per day
+    // New bookmarks per day - using safe parameterized approach
     const dailyBookmarks = await req.db.all(
       `SELECT DATE(created_at) as date, COUNT(*) as new_bookmarks 
        FROM bookmarks 
-       WHERE created_at >= datetime('now', '-${days} days')
+       WHERE created_at >= datetime('now', '-' || ? || ' days')
        GROUP BY DATE(created_at)
-       ORDER BY date ASC`
+       ORDER BY date ASC`,
+      [days]
     );
     
-    // Most active times (hourly distribution)
+    // Most active times (hourly distribution) - using safe parameterized approach
     const hourlyActivity = await req.db.all(
       `SELECT strftime('%H', timestamp) as hour, COUNT(*) as activity 
        FROM analytics 
-       WHERE timestamp >= datetime('now', '-${days} days')
+       WHERE timestamp >= datetime('now', '-' || ? || ' days')
        GROUP BY strftime('%H', timestamp)
-       ORDER BY hour ASC`
+       ORDER BY hour ASC`,
+      [days]
     );
     
     res.json({
