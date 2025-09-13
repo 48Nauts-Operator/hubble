@@ -14,13 +14,9 @@ class HubbleStdioMCP {
   }
 
   async initDatabase() {
-    // Try multiple possible database locations
+    // Use the main Hubble database location ONLY
     const possiblePaths = [
-      process.env.HUBBLE_DB_PATH,
-      '/home/jarvis/projects/Hubble/data/hubble.db',
-      path.join(__dirname, '../data/hubble.db'),
-      path.join(process.cwd(), 'hubble.db'),
-      '/tmp/hubble.db'
+      process.env.HUBBLE_DB_PATH || '/home/jarvis/projects/Hubble/data/hubble.db'
     ].filter(Boolean);
 
     let dbPath = null;

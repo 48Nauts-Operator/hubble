@@ -3,6 +3,38 @@
 
 import { sanitizeText, sanitizeHtml } from './sanitize'
 
+// Cache for validation results to improve performance
+const validationCache = new Map<string, { result: ValidationResult; timestamp: number }>()
+const CACHE_EXPIRY = 60000 // 1 minute
+const CACHE_MAX_SIZE = 1000
+
+// Cache management utilities
+const getCachedResult = (key: string): ValidationResult | null => {
+  const cached = validationCache.get(key)
+  if (cached && (Date.now() - cached.timestamp) < CACHE_EXPIRY) {
+    return cached.result
+  }
+  if (cached) {
+    validationCache.delete(key) // Remove expired entry
+  }
+  return null
+}
+
+const setCachedResult = (key: string, result: ValidationResult): void => {
+  // Clean up cache if it's getting too large
+  if (validationCache.size >= CACHE_MAX_SIZE) {
+    const oldestKey = validationCache.keys().next().value
+    if (oldestKey) {
+      validationCache.delete(oldestKey)
+    }
+  }
+  
+  validationCache.set(key, {
+    result: { ...result }, // Clone to prevent mutations
+    timestamp: Date.now()
+  })
+}
+
 export interface ValidationResult {
   isValid: boolean
   error?: string
@@ -16,20 +48,35 @@ export interface ValidationResult {
  * @returns ValidationResult with sanitized URL
  */
 export function validateUrl(url: string, allowLocalhost: boolean = false): ValidationResult {
+  // Create cache key
+  const cacheKey = `url:${url}:${allowLocalhost}`
+  
+  // Check cache first
+  const cachedResult = getCachedResult(cacheKey)
+  if (cachedResult) {
+    return cachedResult
+  }
+
   if (!url || typeof url !== 'string') {
-    return { isValid: false, error: 'URL is required' }
+    const result = { isValid: false, error: 'URL is required' }
+    setCachedResult(cacheKey, result)
+    return result
   }
 
   const trimmedUrl = url.trim()
   
   // Check length
   if (trimmedUrl.length > 2048) {
-    return { isValid: false, error: 'URL is too long (max 2048 characters)' }
+    const result = { isValid: false, error: 'URL is too long (max 2048 characters)' }
+    setCachedResult(cacheKey, result)
+    return result
   }
 
-  // Basic URL format validation
+  // Basic URL format validation (optimized regex)
   if (!trimmedUrl.match(/^https?:\/\/.+/)) {
-    return { isValid: false, error: 'URL must start with http:// or https://' }
+    const result = { isValid: false, error: 'URL must start with http:// or https://' }
+    setCachedResult(cacheKey, result)
+    return result
   }
 
   try {
@@ -37,7 +84,9 @@ export function validateUrl(url: string, allowLocalhost: boolean = false): Valid
     
     // Check for dangerous protocols
     if (!['http:', 'https:'].includes(urlObj.protocol)) {
-      return { isValid: false, error: 'Only HTTP and HTTPS URLs are allowed' }
+      const result = { isValid: false, error: 'Only HTTP and HTTPS URLs are allowed' }
+      setCachedResult(cacheKey, result)
+      return result
     }
     
     // Check localhost restriction
@@ -48,15 +97,18 @@ export function validateUrl(url: string, allowLocalhost: boolean = false): Valid
       urlObj.hostname.startsWith('10.') ||
       urlObj.hostname.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./))
     ) {
-      // For internal URLs, we allow localhost
-      if (!allowLocalhost) {
-        return { isValid: false, error: 'Private/localhost URLs not allowed in this field' }
-      }
+      const result = { isValid: false, error: 'Private/localhost URLs not allowed in this field' }
+      setCachedResult(cacheKey, result)
+      return result
     }
     
-    return { isValid: true, sanitizedValue: urlObj.toString() }
+    const result = { isValid: true, sanitizedValue: urlObj.toString() }
+    setCachedResult(cacheKey, result)
+    return result
   } catch (error) {
-    return { isValid: false, error: 'Invalid URL format' }
+    const result = { isValid: false, error: 'Invalid URL format' }
+    setCachedResult(cacheKey, result)
+    return result
   }
 }
 
@@ -110,7 +162,7 @@ export function validateTags(
   maxTagLength: number = 50
 ): ValidationResult {
   if (!tagsString || typeof tagsString !== 'string') {
-    return { isValid: true, sanitizedValue: [] }
+    return { isValid: true, sanitizedValue: '' }
   }
 
   const tags = tagsString
@@ -134,7 +186,7 @@ export function validateTags(
     sanitizedTags.push(sanitizeText(tag))
   }
 
-  return { isValid: true, sanitizedValue: sanitizedTags }
+  return { isValid: true, sanitizedValue: sanitizedTags.join(',') }
 }
 
 /**
@@ -267,7 +319,7 @@ export function validateBookmarkForm(formData: BookmarkFormData): BookmarkValida
     if (!tagsValidation.isValid) {
       errors.tags = tagsValidation.error!
     } else {
-      sanitizedData.tags = (tagsValidation.sanitizedValue as string[]).join(', ')
+      sanitizedData.tags = tagsValidation.sanitizedValue as string
     }
   }
 
@@ -296,4 +348,28 @@ export function validateBookmarkForm(formData: BookmarkFormData): BookmarkValida
     errors,
     sanitizedData
   }
+}
+
+/**
+ * Cache management utilities
+ */
+export const validationCacheUtils = {
+  clear: () => validationCache.clear(),
+  size: () => validationCache.size,
+  // Clear expired entries
+  cleanup: () => {
+    const now = Date.now()
+    for (const [key, cached] of validationCache.entries()) {
+      if ((now - cached.timestamp) >= CACHE_EXPIRY) {
+        validationCache.delete(key)
+      }
+    }
+  }
+}
+
+// Periodic cache cleanup (every 5 minutes)
+if (typeof window !== 'undefined') {
+  setInterval(() => {
+    validationCacheUtils.cleanup()
+  }, 5 * 60 * 1000)
 }

@@ -3,16 +3,8 @@
 
 const express = require('express');
 const router = express.Router();
-const { body, param, validationResult } = require('express-validator');
-
-// Validation middleware
-const handleValidationErrors = (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-  next();
-};
+const { param, body } = require('express-validator');
+const { groupValidation, validationChains, handleValidationErrors } = require('../middleware/validation');
 
 // GET /api/groups - Get all groups with hierarchy
 router.get('/', async (req, res, next) => {
@@ -87,14 +79,7 @@ router.get('/:id',
 );
 
 // POST /api/groups - Create new group
-router.post('/',
-  body('name').notEmpty().trim(),
-  body('icon').optional().trim(),
-  body('description').optional().trim(),
-  body('color').optional().matches(/^#[0-9A-Fa-f]{6}$/),
-  body('parent_id').optional(),
-  body('sort_order').optional().isInt(),
-  handleValidationErrors,
+router.post('/', groupValidation,
   async (req, res, next) => {
     try {
       const { name, icon, description, color, parent_id, sort_order } = req.body;
@@ -131,12 +116,12 @@ router.post('/',
 // PUT /api/groups/:id - Update group
 router.put('/:id',
   param('id').notEmpty(),
-  body('name').optional().trim(),
-  body('icon').optional().trim(),
-  body('description').optional().trim(),
-  body('color').optional().matches(/^#[0-9A-Fa-f]{6}$/),
-  body('parent_id').optional(),
-  body('sort_order').optional().isInt(),
+  validationChains.name(false), // optional for updates
+  validationChains.icon(),
+  validationChains.description(),
+  validationChains.color(),
+  validationChains.parent_id(),
+  validationChains.sort_order(),
   handleValidationErrors,
   async (req, res, next) => {
     try {
@@ -187,11 +172,12 @@ router.put('/:id',
 );
 
 // PUT /api/groups/reorder - Update sort order for multiple groups
-router.put('/reorder',
+router.put('/reorder', [
   body('groups').isArray(),
   body('groups.*.id').notEmpty(),
   body('groups.*.sort_order').isInt(),
-  handleValidationErrors,
+  handleValidationErrors
+],
   async (req, res, next) => {
     try {
       const { groups } = req.body;

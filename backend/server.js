@@ -6,6 +6,13 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const { 
+  userWriteLimiter, 
+  userReadLimiter, 
+  userSensitiveLimiter, 
+  userAuthLimiter,
+  extractUserForRateLimit 
+} = require('./middleware/rateLimiting');
 const sqlite3 = require('sqlite3').verbose();
 const { open } = require('sqlite');
 const path = require('path');
@@ -39,15 +46,18 @@ const getAllowedOrigins = () => {
     // Production: Only allow configured domains
     return customOrigins.length > 0 ? customOrigins : ['https://hubble.blockonauts.io'];
   } else {
-    // Development: Allow common dev ports and configured origins
+    // Development: Only allow specific frontend port and configured origins
     const devOrigins = [
-      'http://localhost:3000',
-      'http://localhost:8888',
-      'http://localhost:3378',
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:8888',
-      'http://127.0.0.1:3378'
+      'http://localhost:8888', // Frontend dev server
+      'http://127.0.0.1:8888', // Frontend dev server (IP)
+      'https://hubble.blockonauts.io', // Allow production domain in dev
     ];
+    
+    // Allow additional origins only if explicitly configured
+    if (customOrigins.length > 0) {
+      console.log('Adding custom CORS origins:', customOrigins);
+    }
+    
     return [...devOrigins, ...customOrigins];
   }
 };
@@ -55,21 +65,36 @@ const getAllowedOrigins = () => {
 const allowedOrigins = getAllowedOrigins();
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
+    // In production, reject requests with no origin for security
+    // In development, allow for testing with curl, etc.
+    if (!origin) {
+      return process.env.NODE_ENV === 'production' 
+        ? callback(new Error('Origin required by CORS policy'), false)
+        : callback(null, true);
+    }
     
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.warn(`CORS blocked origin: ${origin}`);
+      console.warn(`CORS blocked origin: ${origin}`, {
+        allowed: allowedOrigins,
+        environment: process.env.NODE_ENV
+      });
       callback(new Error('Not allowed by CORS policy'), false);
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With', 
+    'Accept',
+    'Origin'
+  ],
   exposedHeaders: ['RateLimit-Limit', 'RateLimit-Remaining', 'RateLimit-Reset'],
-  maxAge: 86400 // 24 hours
+  maxAge: process.env.NODE_ENV === 'production' ? 86400 : 300, // Cache preflight: 24h prod, 5m dev
+  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 };
 
 const server = http.createServer(app);
@@ -84,6 +109,9 @@ app.use(helmet({
 }));
 app.use(cors(corsOptions));
 
+// Trust proxy settings for correct IP detection behind nginx
+app.set('trust proxy', 1);
+
 // Rate limiting configuration
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -94,6 +122,7 @@ const generalLimiter = rateLimit({
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  validate: { xForwardedForHeader: false }, // Disable x-forwarded-for validation
 });
 
 // Stricter rate limiting for authentication endpoints
@@ -106,6 +135,7 @@ const authLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false }, // Disable x-forwarded-for validation
 });
 
 // Moderate rate limiting for data modification endpoints
@@ -118,10 +148,14 @@ const writeLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false }, // Disable x-forwarded-for validation
 });
 
 // Apply general rate limiting to all routes
 app.use(generalLimiter);
+
+// Extract user info for rate limiting (before route-specific limits)
+app.use(extractUserForRateLimit);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -162,7 +196,7 @@ app.use((req, res, next) => {
 });
 
 // Auth routes (with strict rate limiting)
-app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', userAuthLimiter, authRoutes);
 
 // Public share routes (no auth required, moderate limiting)
 app.use('/api/public', sharePublicRoutes);
@@ -170,14 +204,14 @@ app.use('/api/public', sharePublicRoutes);
 // Apply auth middleware to all protected routes
 app.use(authMiddleware);
 
-// Protected API Routes with specific rate limiting
-app.use('/api/groups', writeLimiter, groupRoutes);
-app.use('/api/bookmarks', writeLimiter, bookmarkRoutes);
-app.use('/api/analytics', analyticsRoutes); // Read-only, use general limiter
-app.use('/api/health', healthRoutes); // Health checks, use general limiter
-app.use('/api/discovery', discoveryRoutes); // Discovery, use general limiter
-app.use('/api/backup', writeLimiter, backupRoutes); // Backup operations are intensive
-app.use('/api/shares', writeLimiter, shareAdminRoutes);
+// Protected API Routes with user-based rate limiting
+app.use('/api/groups', userWriteLimiter, groupRoutes);
+app.use('/api/bookmarks', userWriteLimiter, bookmarkRoutes);
+app.use('/api/analytics', userReadLimiter, analyticsRoutes); // Read-only, moderate user limits
+app.use('/api/health', userReadLimiter, healthRoutes); // Health checks
+app.use('/api/discovery', userReadLimiter, discoveryRoutes); // Discovery
+app.use('/api/backup', userSensitiveLimiter, backupRoutes); // Backup operations are sensitive
+app.use('/api/shares', userWriteLimiter, shareAdminRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -306,6 +340,21 @@ app.use((err, req, res, next) => {
     status = err.status;
     message = err.message || 'Client error';
     code = 'CLIENT_ERROR';
+  } else if (err.status && err.status >= 500 && err.status < 600) {
+    // Server errors - log details but return generic message
+    status = err.status;
+    message = 'Internal server error';
+    code = 'SERVER_ERROR';
+  } else if (err.name === 'DatabaseError' || err.code === 'SQLITE_ERROR') {
+    // Database errors
+    status = 503;
+    message = 'Service temporarily unavailable';
+    code = 'DATABASE_ERROR';
+  } else if (err.name === 'TimeoutError' || err.code === 'ETIMEDOUT') {
+    // Timeout errors
+    status = 504;
+    message = 'Request timeout';
+    code = 'TIMEOUT';
   }
   
   // Sanitize error message to prevent information disclosure

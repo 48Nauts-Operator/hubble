@@ -6,7 +6,8 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { body, validationResult } = require('express-validator');
+const { body } = require('express-validator');
+const { authValidation, handleValidationErrors } = require('../middleware/validation');
 
 // Constants
 const SALT_ROUNDS = 10;
@@ -18,14 +19,6 @@ function generateSecureToken(length = 64) {
   return crypto.randomBytes(length).toString('hex');
 }
 
-// Validation error handler
-const handleValidationErrors = (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-  next();
-};
 
 // CSRF protection for state-changing operations
 const csrfProtection = (req, res, next) => {
@@ -79,13 +72,7 @@ router.get('/status', async (req, res, next) => {
 // POST /api/auth/setup - First-time setup
 router.post('/setup',
   csrfProtection,
-  body('password')
-    .isLength({ min: 8 })
-    .withMessage('Password must be at least 8 characters')
-    .matches(/^(?=.*[0-9])(?=.*[!@#$%^&*])/)
-    .withMessage('Password must contain at least one number and one special character'),
-  body('email').optional().isEmail(),
-  handleValidationErrors,
+  ...authValidation.setup,
   async (req, res, next) => {
     try {
       // Check if already configured
@@ -132,9 +119,7 @@ router.post('/setup',
 // POST /api/auth/login - Login endpoint
 router.post('/login',
   csrfProtection,
-  body('password').notEmpty(),
-  body('remember').optional().isBoolean(),
-  handleValidationErrors,
+  ...authValidation.login,
   async (req, res, next) => {
     try {
       const { password, remember = false } = req.body;

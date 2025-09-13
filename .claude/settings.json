@@ -1,5 +1,35 @@
 {
+  "permissions": {
+    "allow": [
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(npm install:*)",
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(docker-compose restart:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker-compose stop:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose:*)"
+    ],
+    "deny": [],
+    "additionalDirectories": [
+      "/home/jarvis/projects/obsidian-vault/nautcode-vault"
+    ]
+  },
   "hooks": {
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command", 
+            "command": "echo \"$(date): PreCompact hook triggered\" >> /tmp/precompact.log && cat /home/jarvis/.claude/commands/changes.md"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "*",
