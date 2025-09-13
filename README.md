@@ -2,16 +2,41 @@
 
 <div align="center">
   <img src="docs/assets/hubble-logo.svg" alt="Hubble Logo" width="200" height="200">
-  
-  [![Version](https://img.shields.io/badge/Version-1.3.0-brightgreen.svg)](https://github.com/48Nauts-Operator/hubble/releases)
+
+  [![Version](https://img.shields.io/badge/Version-1.3.1-brightgreen.svg)](https://github.com/48Nauts-Operator/hubble/releases)
   [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
   [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
   [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
-  
+
   **A powerful, self-hosted bookmark dashboard designed for developers and teams**
-  
+
   [Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Contributing](#-contributing)
 </div>
+
+---
+
+## ⚠️ IMPORTANT: MCP Configuration Update Required (v1.3.1)
+
+**If you're using Hubble with Claude Desktop MCP**, you must update your configuration to fix a critical database issue.
+
+### What Changed?
+- Fixed split-brain issue where MCP was saving bookmarks to wrong database (`/tmp/hubble.db`)
+- Consolidated to single database location for all bookmarks
+
+### Required Action for Claude Desktop Users:
+```bash
+# 1. Remove old MCP configuration
+claude mcp remove hubble
+
+# 2. Add updated configuration with correct database path
+HUBBLE_DB_PATH="/home/jarvis/projects/Hubble/data/hubble.db" \
+  claude mcp add hubble -s user -- \
+  node /home/jarvis/projects/Hubble/mcp-server/mcp-stdio.js
+
+# 3. Restart Claude Desktop
+```
+
+See [CHANGELOG.md](CHANGELOG.md) for full details.
 
 ---
 
