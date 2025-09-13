@@ -13,7 +13,7 @@ claude mcp remove hubble
 claude mcp add hubble -s user --node [path]
 ```
 
-Details: github.com/48Nauts-Operator/hubble/releases/v1.3.1
+Details: https://github.com/48Nauts-Operator/hubble/releases/tag/v1.3.1
 
 ## Thread Option (if you want more detail)
 
@@ -37,7 +37,7 @@ The Fix:
 2️⃣ Add fixed config: `claude mcp add hubble -s user --node [path]`
 3️⃣ Restart Claude Desktop
 
-Full migration guide: github.com/48Nauts-Operator/hubble/releases/v1.3.1
+Full migration guide: https://github.com/48Nauts-Operator/hubble/releases/tag/v1.3.1
 
 ### Tweet 4
 What this fixes:
@@ -55,6 +55,6 @@ Thanks to everyone who reported this issue! 🙏
 Bookmarks were saving to wrong database. Claude Desktop users must update config.
 
 Fix takes 30 seconds:
-github.com/48Nauts-Operator/hubble#mcp-update
+https://github.com/48Nauts-Operator/hubble/releases/tag/v1.3.1
 
 #MCP #ClaudeDesktop #DevTools
