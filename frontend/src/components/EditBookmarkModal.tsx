@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { bookmarkApi } from '@/services/api'
 import type { Bookmark, BookmarkGroup } from '@/stores/useBookmarkStore'
 import { useBookmarkStore } from '@/stores/useBookmarkStore'
+import { validateBookmarkForm, type BookmarkFormData } from '@/utils/validation'
 
 interface EditBookmarkModalProps {
   isOpen: boolean
@@ -28,6 +29,7 @@ export function EditBookmarkModal({ isOpen, onClose, bookmark, groups }: EditBoo
   const [environment, setEnvironment] = useState<'production' | 'staging' | 'uat' | 'development' | 'local'>('production')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   
   const updateBookmark = useBookmarkStore((state) => state.updateBookmark)
 
@@ -51,24 +53,45 @@ export function EditBookmarkModal({ isOpen, onClose, bookmark, groups }: EditBoo
     
     setIsLoading(true)
     setError(null)
+    setFieldErrors({})
     
     try {
-      const updateData: any = {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        groupId: groupId || undefined,
-        tags: tags.split(',').map(t => t.trim()).filter(Boolean),
-        icon: icon.trim() || undefined,
-        environment: environment
+      // Validate form data
+      const formData: BookmarkFormData = {
+        title,
+        externalUrl,
+        internalUrl,
+        description,
+        tags,
+        icon,
+        environment
       }
       
-      // Handle URL fields - external URL is the primary URL
-      if (externalUrl.trim()) {
-        updateData.url = externalUrl.trim()
-        updateData.externalUrl = externalUrl.trim()
+      const validation = validateBookmarkForm(formData)
+      
+      if (!validation.isValid) {
+        setFieldErrors(validation.errors)
+        setError('Please fix the validation errors below')
+        return
       }
-      if (internalUrl.trim()) {
-        updateData.internalUrl = internalUrl.trim()
+      
+      // Use sanitized data for API call
+      const updateData: any = {
+        title: validation.sanitizedData.title,
+        description: validation.sanitizedData.description || undefined,
+        groupId: groupId || undefined,
+        tags: validation.sanitizedData.tags ? validation.sanitizedData.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        icon: validation.sanitizedData.icon || undefined,
+        environment: validation.sanitizedData.environment || environment
+      }
+      
+      // Handle URL fields with sanitized data
+      if (validation.sanitizedData.externalUrl) {
+        updateData.url = validation.sanitizedData.externalUrl
+        updateData.externalUrl = validation.sanitizedData.externalUrl
+      }
+      if (validation.sanitizedData.internalUrl) {
+        updateData.internalUrl = validation.sanitizedData.internalUrl
       }
       
       const updatedBookmark = await bookmarkApi.updateBookmark(bookmark.id, updateData)
@@ -138,8 +161,13 @@ export function EditBookmarkModal({ isOpen, onClose, bookmark, groups }: EditBoo
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="My Bookmark"
+                    maxLength={200}
                     required
+                    className={fieldErrors.title ? 'border-red-400 focus:ring-red-400' : ''}
                   />
+                  {fieldErrors.title && (
+                    <p className="text-sm text-red-400">{fieldErrors.title}</p>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
@@ -150,8 +178,13 @@ export function EditBookmarkModal({ isOpen, onClose, bookmark, groups }: EditBoo
                     value={externalUrl}
                     onChange={(e) => setExternalUrl(e.target.value)}
                     placeholder="https://example.com"
+                    maxLength={2048}
                     required
+                    className={fieldErrors.externalUrl ? 'border-red-400 focus:ring-red-400' : ''}
                   />
+                  {fieldErrors.externalUrl && (
+                    <p className="text-sm text-red-400">{fieldErrors.externalUrl}</p>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
@@ -162,7 +195,12 @@ export function EditBookmarkModal({ isOpen, onClose, bookmark, groups }: EditBoo
                     value={internalUrl}
                     onChange={(e) => setInternalUrl(e.target.value)}
                     placeholder="http://192.168.1.100:3000"
+                    maxLength={2048}
+                    className={fieldErrors.internalUrl ? 'border-red-400 focus:ring-red-400' : ''}
                   />
+                  {fieldErrors.internalUrl && (
+                    <p className="text-sm text-red-400">{fieldErrors.internalUrl}</p>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
@@ -172,9 +210,15 @@ export function EditBookmarkModal({ isOpen, onClose, bookmark, groups }: EditBoo
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Brief description..."
-                    className="w-full px-3 py-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                    maxLength={1000}
+                    className={`w-full px-3 py-2 text-sm bg-background border rounded-md focus:outline-none focus:ring-2 ${
+                      fieldErrors.description ? 'border-red-400 focus:ring-red-400' : 'border-input focus:ring-ring'
+                    }`}
                     rows={3}
                   />
+                  {fieldErrors.description && (
+                    <p className="text-sm text-red-400">{fieldErrors.description}</p>
+                  )}
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
@@ -219,7 +263,12 @@ export function EditBookmarkModal({ isOpen, onClose, bookmark, groups }: EditBoo
                     value={tags}
                     onChange={(e) => setTags(e.target.value)}
                     placeholder="web, api, dashboard"
+                    maxLength={500}
+                    className={fieldErrors.tags ? 'border-red-400 focus:ring-red-400' : ''}
                   />
+                  {fieldErrors.tags && (
+                    <p className="text-sm text-red-400">{fieldErrors.tags}</p>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
@@ -229,7 +278,12 @@ export function EditBookmarkModal({ isOpen, onClose, bookmark, groups }: EditBoo
                     value={icon}
                     onChange={(e) => setIcon(e.target.value)}
                     placeholder="🚀 or https://example.com/icon.png"
+                    maxLength={200}
+                    className={fieldErrors.icon ? 'border-red-400 focus:ring-red-400' : ''}
                   />
+                  {fieldErrors.icon && (
+                    <p className="text-sm text-red-400">{fieldErrors.icon}</p>
+                  )}
                 </div>
               </div>
               

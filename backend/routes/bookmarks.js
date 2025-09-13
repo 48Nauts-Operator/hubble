@@ -4,6 +4,7 @@
 const express = require('express');
 const router = express.Router();
 const { body, param, query, validationResult } = require('express-validator');
+const { authMiddleware, checkResourceOwnership, requireAdmin } = require('../middleware/auth');
 
 // Validation middleware
 const handleValidationErrors = (req, res, next) => {
@@ -16,6 +17,8 @@ const handleValidationErrors = (req, res, next) => {
 
 // GET /api/bookmarks - Get bookmarks with filtering
 router.get('/',
+  authMiddleware,
+  requireAdmin,
   query('group_id').optional(),
   query('environment').optional().isIn(['development', 'uat', 'production', 'staging']),
   query('search').optional().trim(),
@@ -130,16 +133,78 @@ router.get('/:id',
 
 // POST /api/bookmarks - Create new bookmark
 router.post('/',
-  body('title').notEmpty().trim(),
-  body('url').notEmpty().isURL(),
-  body('internal_url').optional().isURL({ require_protocol: true }),
-  body('external_url').optional().isURL({ require_protocol: true }),
-  body('group_id').optional(),
-  body('description').optional().trim(),
-  body('icon').optional().trim(),
-  body('tags').optional().isArray(),
-  body('color').optional().custom(value => !value || /^#[0-9A-Fa-f]{6}$/.test(value)),
-  body('environment').optional().isIn(['development', 'uat', 'production', 'staging', 'local']),
+  authMiddleware,
+  requireAdmin,
+  // Title validation - required, max 200 chars, sanitized
+  body('title')
+    .notEmpty().withMessage('Title is required')
+    .isLength({ max: 200 }).withMessage('Title must be less than 200 characters')
+    .trim()
+    .escape(),
+  
+  // URL validation - required, valid URL format, max 2048 chars
+  body('url')
+    .notEmpty().withMessage('URL is required')
+    .isLength({ max: 2048 }).withMessage('URL must be less than 2048 characters')
+    .isURL({ protocols: ['http', 'https'] }).withMessage('Must be a valid HTTP/HTTPS URL'),
+  
+  // Internal URL validation - optional, allow localhost, max 2048 chars  
+  body('internal_url')
+    .optional()
+    .isLength({ max: 2048 }).withMessage('Internal URL must be less than 2048 characters')
+    .isURL({ protocols: ['http', 'https'] }).withMessage('Must be a valid HTTP/HTTPS URL'),
+  
+  // External URL validation - optional, valid URL format, max 2048 chars
+  body('external_url')
+    .optional()
+    .isLength({ max: 2048 }).withMessage('External URL must be less than 2048 characters')
+    .isURL({ protocols: ['http', 'https'] }).withMessage('Must be a valid HTTP/HTTPS URL'),
+  
+  // Group ID validation
+  body('group_id').optional().isString().trim(),
+  
+  // Description validation - optional, max 1000 chars, allow basic HTML
+  body('description')
+    .optional()
+    .isLength({ max: 1000 }).withMessage('Description must be less than 1000 characters')
+    .trim(),
+  
+  // Icon validation - optional, max 200 chars
+  body('icon')
+    .optional()
+    .isLength({ max: 200 }).withMessage('Icon must be less than 200 characters')
+    .trim(),
+  
+  // Tags validation - optional array, max 10 tags, max 50 chars per tag
+  body('tags')
+    .optional()
+    .isArray().withMessage('Tags must be an array')
+    .custom((tags) => {
+      if (!Array.isArray(tags)) return false;
+      if (tags.length > 10) throw new Error('Maximum 10 tags allowed');
+      
+      for (const tag of tags) {
+        if (typeof tag !== 'string') throw new Error('All tags must be strings');
+        if (tag.length > 50) throw new Error('Each tag must be less than 50 characters');
+        if (tag.includes('<') || tag.includes('>') || tag.includes('"') || tag.includes("'")) {
+          throw new Error('Tags cannot contain HTML or quotes');
+        }
+      }
+      return true;
+    }),
+  
+  // Color validation - optional hex color
+  body('color')
+    .optional()
+    .custom(value => !value || /^#[0-9A-Fa-f]{6}$/.test(value))
+    .withMessage('Color must be a valid hex color'),
+  
+  // Environment validation - optional, predefined values
+  body('environment')
+    .optional()
+    .isIn(['development', 'uat', 'production', 'staging', 'local'])
+    .withMessage('Invalid environment value'),
+  
   handleValidationErrors,
   async (req, res, next) => {
     try {
@@ -235,18 +300,87 @@ router.post('/',
 
 // PUT /api/bookmarks/:id - Update bookmark
 router.put('/:id',
-  param('id').notEmpty(),
-  body('title').optional().trim(),
-  body('url').optional().isURL(),
-  body('internal_url').optional().isURL({ require_protocol: true }),
-  body('external_url').optional().isURL({ require_protocol: true }),
-  body('group_id').optional(),
-  body('description').optional().trim(),
-  body('icon').optional().trim(),
-  body('tags').optional().isArray(),
-  body('color').optional().custom(value => !value || /^#[0-9A-Fa-f]{6}$/.test(value)),
-  body('environment').optional().isIn(['development', 'uat', 'production', 'staging', 'local']),
-  body('health_status').optional().isIn(['up', 'down', 'unknown']),
+  authMiddleware,
+  requireAdmin,
+  param('id').notEmpty().withMessage('Bookmark ID is required'),
+  checkResourceOwnership('bookmark'),
+  
+  // Title validation - optional for updates, max 200 chars, sanitized
+  body('title')
+    .optional()
+    .isLength({ max: 200 }).withMessage('Title must be less than 200 characters')
+    .trim()
+    .escape(),
+  
+  // URL validation - optional for updates, valid URL format, max 2048 chars
+  body('url')
+    .optional()
+    .isLength({ max: 2048 }).withMessage('URL must be less than 2048 characters')
+    .isURL({ protocols: ['http', 'https'] }).withMessage('Must be a valid HTTP/HTTPS URL'),
+  
+  // Internal URL validation - optional, allow localhost, max 2048 chars  
+  body('internal_url')
+    .optional()
+    .isLength({ max: 2048 }).withMessage('Internal URL must be less than 2048 characters')
+    .isURL({ protocols: ['http', 'https'] }).withMessage('Must be a valid HTTP/HTTPS URL'),
+  
+  // External URL validation - optional, valid URL format, max 2048 chars
+  body('external_url')
+    .optional()
+    .isLength({ max: 2048 }).withMessage('External URL must be less than 2048 characters')
+    .isURL({ protocols: ['http', 'https'] }).withMessage('Must be a valid HTTP/HTTPS URL'),
+  
+  // Group ID validation
+  body('group_id').optional().isString().trim(),
+  
+  // Description validation - optional, max 1000 chars, allow basic HTML
+  body('description')
+    .optional()
+    .isLength({ max: 1000 }).withMessage('Description must be less than 1000 characters')
+    .trim(),
+  
+  // Icon validation - optional, max 200 chars
+  body('icon')
+    .optional()
+    .isLength({ max: 200 }).withMessage('Icon must be less than 200 characters')
+    .trim(),
+  
+  // Tags validation - optional array, max 10 tags, max 50 chars per tag
+  body('tags')
+    .optional()
+    .isArray().withMessage('Tags must be an array')
+    .custom((tags) => {
+      if (!Array.isArray(tags)) return false;
+      if (tags.length > 10) throw new Error('Maximum 10 tags allowed');
+      
+      for (const tag of tags) {
+        if (typeof tag !== 'string') throw new Error('All tags must be strings');
+        if (tag.length > 50) throw new Error('Each tag must be less than 50 characters');
+        if (tag.includes('<') || tag.includes('>') || tag.includes('"') || tag.includes("'")) {
+          throw new Error('Tags cannot contain HTML or quotes');
+        }
+      }
+      return true;
+    }),
+  
+  // Color validation - optional hex color
+  body('color')
+    .optional()
+    .custom(value => !value || /^#[0-9A-Fa-f]{6}$/.test(value))
+    .withMessage('Color must be a valid hex color'),
+  
+  // Environment validation - optional, predefined values
+  body('environment')
+    .optional()
+    .isIn(['development', 'uat', 'production', 'staging', 'local'])
+    .withMessage('Invalid environment value'),
+  
+  // Health status validation - optional, predefined values
+  body('health_status')
+    .optional()
+    .isIn(['up', 'down', 'unknown'])
+    .withMessage('Invalid health status value'),
+  
   handleValidationErrors,
   async (req, res, next) => {
     try {
@@ -356,7 +490,10 @@ router.patch('/:id/click',
 
 // DELETE /api/bookmarks/:id - Delete bookmark
 router.delete('/:id',
-  param('id').notEmpty(),
+  authMiddleware,
+  requireAdmin,
+  param('id').notEmpty().withMessage('Bookmark ID is required'),
+  checkResourceOwnership('bookmark'),
   handleValidationErrors,
   async (req, res, next) => {
     try {

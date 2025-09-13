@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "hubble": {
+      "command": "node",
+      "args": ["/home/jarvis/projects/Hubble/mcp-server/mcp-stdio.js"],
+      "env": {
+        "HUBBLE_DB_PATH": "/home/jarvis/projects/Hubble/data/hubble.db"
+      }
+    }
+  }
+}

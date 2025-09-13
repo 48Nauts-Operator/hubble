@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import { bookmarkApi } from '@/services/api'
 import { useBookmarkStore, type BookmarkGroup } from '@/stores/useBookmarkStore'
+import { validateBookmarkForm, type BookmarkFormData } from '@/utils/validation'
 
 export interface AddBookmarkModalProps {
   isOpen: boolean
@@ -21,6 +22,7 @@ export function AddBookmarkModal({ isOpen, onClose, groups }: AddBookmarkModalPr
   const [environment, setEnvironment] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [urlMode, setUrlMode] = useState<'single' | 'dual'>('single')
 
   const { addBookmark } = useBookmarkStore()
@@ -28,19 +30,57 @@ export function AddBookmarkModal({ isOpen, onClose, groups }: AddBookmarkModalPr
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setFieldErrors({})
     setIsSubmitting(true)
 
     try {
-      const bookmark = await bookmarkApi.createBookmark({
+      // Validate form data
+      const formData: BookmarkFormData = {
         title,
-        url: urlMode === 'single' ? url : (externalUrl || url),
+        url: urlMode === 'single' ? url : undefined,
+        externalUrl: urlMode === 'dual' ? externalUrl : undefined,
         internalUrl: urlMode === 'dual' ? internalUrl : undefined,
-        externalUrl: urlMode === 'dual' ? externalUrl : (urlMode === 'single' ? url : undefined),
         description,
-        groupId: groupId || groups[0]?.id,
-        tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+        tags,
         icon,
-        environment: environment as any,
+        environment
+      }
+      
+      // Additional validation for URL modes
+      if (urlMode === 'single' && !url.trim()) {
+        setFieldErrors({ url: 'URL is required' })
+        setError('Please fix the validation errors below')
+        return
+      }
+      
+      if (urlMode === 'dual' && !externalUrl.trim() && !internalUrl.trim()) {
+        setFieldErrors({ 
+          externalUrl: 'At least one URL is required',
+          internalUrl: 'At least one URL is required'
+        })
+        setError('Please provide at least one URL')
+        return
+      }
+      
+      const validation = validateBookmarkForm(formData)
+      
+      if (!validation.isValid) {
+        setFieldErrors(validation.errors)
+        setError('Please fix the validation errors below')
+        return
+      }
+      
+      // Use sanitized data for API call
+      const bookmark = await bookmarkApi.createBookmark({
+        title: validation.sanitizedData.title!,
+        url: validation.sanitizedData.url || validation.sanitizedData.externalUrl || '',
+        internalUrl: validation.sanitizedData.internalUrl,
+        externalUrl: validation.sanitizedData.externalUrl || (urlMode === 'single' ? validation.sanitizedData.url : undefined),
+        description: validation.sanitizedData.description,
+        groupId: groupId || groups[0]?.id,
+        tags: validation.sanitizedData.tags ? validation.sanitizedData.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        icon: validation.sanitizedData.icon,
+        environment: validation.sanitizedData.environment as any,
         clickCount: 0
       })
       
@@ -66,6 +106,7 @@ export function AddBookmarkModal({ isOpen, onClose, groups }: AddBookmarkModalPr
     setEnvironment('')
     setUrlMode('single')
     setError(null)
+    setFieldErrors({})
   }
 
   if (!isOpen) return null
@@ -96,9 +137,15 @@ export function AddBookmarkModal({ isOpen, onClose, groups }: AddBookmarkModalPr
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              maxLength={200}
+              className={`w-full px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 ${
+                fieldErrors.title ? 'border-red-400 focus:ring-red-400' : 'border-input focus:ring-primary'
+              }`}
               required
             />
+            {fieldErrors.title && (
+              <p className="text-sm text-red-400 mt-1">{fieldErrors.title}</p>
+            )}
           </div>
 
           <div>
@@ -127,14 +174,22 @@ export function AddBookmarkModal({ isOpen, onClose, groups }: AddBookmarkModalPr
             </div>
             
             {urlMode === 'single' ? (
-              <input
-                type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="https://example.com"
-                required
-              />
+              <div>
+                <input
+                  type="url"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  maxLength={2048}
+                  className={`w-full px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 ${
+                    fieldErrors.url ? 'border-red-400 focus:ring-red-400' : 'border-input focus:ring-primary'
+                  }`}
+                  placeholder="https://example.com"
+                  required
+                />
+                {fieldErrors.url && (
+                  <p className="text-sm text-red-400 mt-1">{fieldErrors.url}</p>
+                )}
+              </div>
             ) : (
               <div className="space-y-2">
                 <div>
@@ -143,9 +198,15 @@ export function AddBookmarkModal({ isOpen, onClose, groups }: AddBookmarkModalPr
                     type="url"
                     value={externalUrl}
                     onChange={(e) => setExternalUrl(e.target.value)}
-                    className="w-full px-3 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    maxLength={2048}
+                    className={`w-full px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 ${
+                      fieldErrors.externalUrl ? 'border-red-400 focus:ring-red-400' : 'border-input focus:ring-primary'
+                    }`}
                     placeholder="https://myservice.com"
                   />
+                  {fieldErrors.externalUrl && (
+                    <p className="text-sm text-red-400 mt-1">{fieldErrors.externalUrl}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs text-muted-foreground mb-1">Internal URL (Network)</label>
@@ -153,9 +214,15 @@ export function AddBookmarkModal({ isOpen, onClose, groups }: AddBookmarkModalPr
                     type="url"
                     value={internalUrl}
                     onChange={(e) => setInternalUrl(e.target.value)}
-                    className="w-full px-3 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    maxLength={2048}
+                    className={`w-full px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 ${
+                      fieldErrors.internalUrl ? 'border-red-400 focus:ring-red-400' : 'border-input focus:ring-primary'
+                    }`}
                     placeholder="http://192.168.1.100:3000"
                   />
+                  {fieldErrors.internalUrl && (
+                    <p className="text-sm text-red-400 mt-1">{fieldErrors.internalUrl}</p>
+                  )}
                 </div>
               </div>
             )}
@@ -166,9 +233,15 @@ export function AddBookmarkModal({ isOpen, onClose, groups }: AddBookmarkModalPr
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              maxLength={1000}
+              className={`w-full px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 ${
+                fieldErrors.description ? 'border-red-400 focus:ring-red-400' : 'border-input focus:ring-primary'
+              }`}
               rows={3}
             />
+            {fieldErrors.description && (
+              <p className="text-sm text-red-400 mt-1">{fieldErrors.description}</p>
+            )}
           </div>
 
           <div>
@@ -192,9 +265,15 @@ export function AddBookmarkModal({ isOpen, onClose, groups }: AddBookmarkModalPr
               type="text"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
-              className="w-full px-3 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              maxLength={500}
+              className={`w-full px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 ${
+                fieldErrors.tags ? 'border-red-400 focus:ring-red-400' : 'border-input focus:ring-primary'
+              }`}
               placeholder="work, important, api"
             />
+            {fieldErrors.tags && (
+              <p className="text-sm text-red-400 mt-1">{fieldErrors.tags}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -219,9 +298,15 @@ export function AddBookmarkModal({ isOpen, onClose, groups }: AddBookmarkModalPr
                 type="text"
                 value={icon}
                 onChange={(e) => setIcon(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                maxLength={2}
+                maxLength={200}
+                className={`w-full px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 ${
+                  fieldErrors.icon ? 'border-red-400 focus:ring-red-400' : 'border-input focus:ring-primary'
+                }`}
+                placeholder="🚀 or https://icon.url"
               />
+              {fieldErrors.icon && (
+                <p className="text-sm text-red-400 mt-1">{fieldErrors.icon}</p>
+              )}
             </div>
           </div>
 

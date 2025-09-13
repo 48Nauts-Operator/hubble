@@ -56,15 +56,16 @@ class AuthService {
 
   // Get auth headers for API requests
   getAuthHeaders(): HeadersInit {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+
     if (this.token) {
-      return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.token}`
-      }
+      headers['Authorization'] = `Bearer ${this.token}`
     }
-    return {
-      'Content-Type': 'application/json'
-    }
+
+    return headers
   }
 
   // Check auth status (enabled/configured)
@@ -80,7 +81,10 @@ class AuthService {
   async setup(data: SetupRequest): Promise<LoginResponse> {
     const response = await fetch(`${API_BASE_URL}/auth/setup`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
       body: JSON.stringify(data)
     })
     
@@ -100,7 +104,10 @@ class AuthService {
   async login(password: string, remember: boolean = false): Promise<LoginResponse> {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
       body: JSON.stringify({ password, remember })
     })
     

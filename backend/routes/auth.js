@@ -6,7 +6,8 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { body, validationResult } = require('express-validator');
+const { body } = require('express-validator');
+const { authValidation, handleValidationErrors } = require('../middleware/validation');
 
 // Constants
 const SALT_ROUNDS = 10;
@@ -18,12 +19,23 @@ function generateSecureToken(length = 64) {
   return crypto.randomBytes(length).toString('hex');
 }
 
-// Validation error handler
-const handleValidationErrors = (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
+
+// CSRF protection for state-changing operations
+const csrfProtection = (req, res, next) => {
+  // Skip CSRF for GET requests (they should be idempotent)
+  if (req.method === 'GET') {
+    return next();
   }
+
+  // Check for custom header that proves this is a programmatic request
+  const customHeader = req.headers['x-requested-with'];
+  if (!customHeader || customHeader !== 'XMLHttpRequest') {
+    return res.status(403).json({ 
+      error: 'CSRF protection: Missing required header',
+      message: 'This request must include the X-Requested-With header'
+    });
+  }
+
   next();
 };
 
@@ -59,13 +71,8 @@ router.get('/status', async (req, res, next) => {
 
 // POST /api/auth/setup - First-time setup
 router.post('/setup',
-  body('password')
-    .isLength({ min: 8 })
-    .withMessage('Password must be at least 8 characters')
-    .matches(/^(?=.*[0-9])(?=.*[!@#$%^&*])/)
-    .withMessage('Password must contain at least one number and one special character'),
-  body('email').optional().isEmail(),
-  handleValidationErrors,
+  csrfProtection,
+  ...authValidation.setup,
   async (req, res, next) => {
     try {
       // Check if already configured
@@ -111,9 +118,8 @@ router.post('/setup',
 
 // POST /api/auth/login - Login endpoint
 router.post('/login',
-  body('password').notEmpty(),
-  body('remember').optional().isBoolean(),
-  handleValidationErrors,
+  csrfProtection,
+  ...authValidation.login,
   async (req, res, next) => {
     try {
       const { password, remember = false } = req.body;
@@ -198,7 +204,7 @@ router.post('/login',
 );
 
 // POST /api/auth/logout - Logout endpoint
-router.post('/logout', async (req, res, next) => {
+router.post('/logout', csrfProtection, async (req, res, next) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) {
@@ -216,7 +222,7 @@ router.post('/logout', async (req, res, next) => {
 });
 
 // POST /api/auth/verify - Verify current token
-router.post('/verify', async (req, res, next) => {
+router.post('/verify', csrfProtection, async (req, res, next) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) {
