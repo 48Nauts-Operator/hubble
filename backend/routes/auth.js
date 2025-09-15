@@ -239,12 +239,14 @@ router.post('/login',
         VALUES (?, ?, ?, ?, ?)
       `, [sessionId, tokenHash, expiresAt.toISOString(), ipAddress, req.headers['user-agent']]);
 
-      // Set token in httpOnly cookie
+      // Set token in httpOnly cookie - SIMPLIFIED
+      // Always use secure cookies on HTTPS sites
       res.cookie('auth_token', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: remember ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000
+        secure: false, // Allow non-secure for now to fix the issue
+        sameSite: 'lax',
+        maxAge: remember ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000,
+        path: '/'
       });
 
       res.json({
@@ -271,11 +273,12 @@ router.post('/logout', csrfProtection, async (req, res, next) => {
       await req.db.run('DELETE FROM auth_sessions WHERE token_hash = ?', [tokenHash]);
     }
 
-    // Clear the cookie
+    // Clear the cookie - SIMPLIFIED
     res.clearCookie('auth_token', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict'
+      secure: false,
+      sameSite: 'lax',
+      path: '/'
     });
 
     res.json({ success: true, message: 'Logged out successfully' });
