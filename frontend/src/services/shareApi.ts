@@ -81,6 +81,15 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json()
 }
 
+// Type guards for API responses
+function isValidShareResponse(data: any): data is Record<string, any> {
+  return data && typeof data === 'object' && (data.id || data.uid)
+}
+
+function isValidSharesResponse(data: any): data is Record<string, any> {
+  return data && typeof data === 'object' && (Array.isArray(data) || Array.isArray(data.shares))
+}
+
 // Transform backend share data to frontend format
 function transformShare(backendShare: any): SharedView {
   // Always use the actual origin for share URLs
@@ -187,7 +196,12 @@ export const shareApi = {
     const response = await fetch(`${API_BASE_URL}/shares`, {
       headers: authService.getAuthHeaders()
     })
-    const data = await handleResponse<any>(response)
+    const data = await handleResponse<unknown>(response)
+
+    if (!isValidSharesResponse(data)) {
+      throw new Error('Invalid shares response format')
+    }
+
     // Handle both array and object with shares property
     const shares = Array.isArray(data) ? data : (data.shares || [])
     return shares.map(transformShare)
@@ -199,7 +213,12 @@ export const shareApi = {
       headers: authService.getAuthHeaders(),
       body: JSON.stringify(transformShareForBackend(share))
     })
-    const data = await handleResponse<any>(response)
+    const data = await handleResponse<unknown>(response)
+
+    if (!isValidShareResponse(data)) {
+      throw new Error('Invalid share response format')
+    }
+
     return transformShare(data)
   },
 
@@ -207,7 +226,12 @@ export const shareApi = {
     const response = await fetch(`${API_BASE_URL}/shares/${id}`, {
       headers: authService.getAuthHeaders()
     })
-    const data = await handleResponse<any>(response)
+    const data = await handleResponse<unknown>(response)
+
+    if (!isValidShareResponse(data)) {
+      throw new Error('Invalid share response format')
+    }
+
     return transformShare(data)
   },
 
@@ -217,7 +241,12 @@ export const shareApi = {
       headers: authService.getAuthHeaders(),
       body: JSON.stringify(transformShareForBackend(share))
     })
-    const data = await handleResponse<any>(response)
+    const data = await handleResponse<unknown>(response)
+
+    if (!isValidShareResponse(data)) {
+      throw new Error('Invalid share response format')
+    }
+
     return transformShare(data)
   },
 
@@ -233,7 +262,12 @@ export const shareApi = {
 
   async getPublicShare(uid: string): Promise<any> {
     const response = await fetch(`${API_BASE_URL}/public/share/${uid}`)
-    const data = await handleResponse<any>(response)
+    const data = await handleResponse<unknown>(response)
+
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid public share response format')
+    }
+
     return data
   },
 
@@ -246,11 +280,18 @@ export const shareApi = {
     const response = await fetch(`${API_BASE_URL}/shares/${id}/analytics`, {
       headers: authService.getAuthHeaders()
     })
-    const data = await handleResponse<any>(response)
+    const data = await handleResponse<unknown>(response)
+
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid analytics response format')
+    }
+
+    const analyticsData = data as Record<string, any>
     return {
-      ...data,
-      lastAccessed: data.lastAccessed ? new Date(data.lastAccessed) : undefined,
-      dailyViews: data.dailyViews || []
+      totalViews: typeof analyticsData.totalViews === 'number' ? analyticsData.totalViews : 0,
+      uniqueVisitors: typeof analyticsData.uniqueVisitors === 'number' ? analyticsData.uniqueVisitors : 0,
+      lastAccessed: analyticsData.lastAccessed ? new Date(analyticsData.lastAccessed) : undefined,
+      dailyViews: Array.isArray(analyticsData.dailyViews) ? analyticsData.dailyViews : []
     }
   }
 }

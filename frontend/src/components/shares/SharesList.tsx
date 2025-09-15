@@ -46,8 +46,30 @@ export function SharesList({ shares, loading, onEdit, onDelete, onToggleStatus }
     }
   }
 
+  /**
+   * Safely generates and validates QR code data URL to prevent XSS attacks.
+   * Implements multiple layers of validation before setting the QR code URL.
+   */
   const generateQRCode = async (share: SharedView) => {
     try {
+      // Validate input URL to prevent malicious data from being encoded
+      if (!share.shareUrl || typeof share.shareUrl !== 'string') {
+        console.error('Invalid share URL provided for QR code generation')
+        return
+      }
+
+      // Ensure the share URL is a valid HTTP/HTTPS URL
+      try {
+        const url = new URL(share.shareUrl)
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+          console.error('QR code generation blocked: Invalid URL protocol')
+          return
+        }
+      } catch (urlError) {
+        console.error('QR code generation blocked: Malformed URL')
+        return
+      }
+
       const qrDataUrl = await QRCode.toDataURL(share.shareUrl, {
         errorCorrectionLevel: 'M',
         margin: 1,
@@ -57,11 +79,59 @@ export function SharesList({ shares, loading, onEdit, onDelete, onToggleStatus }
         },
         width: 256
       })
+
+      // Comprehensive validation of the generated data URL
+      if (!isValidQRCodeDataUrl(qrDataUrl)) {
+        console.error('QR code validation failed - refusing to set unsafe data URL')
+        return
+      }
+
       setQrCodeUrl(qrDataUrl)
       setQrModalShare(share)
     } catch (error) {
       console.error('Failed to generate QR code:', error)
     }
+  }
+
+  /**
+   * Validates QR code data URL to ensure it's safe for use in img src attribute.
+   * Prevents XSS attacks through malicious data URLs.
+   */
+  const isValidQRCodeDataUrl = (dataUrl: string): boolean => {
+    // Check basic data URL structure
+    if (!dataUrl || typeof dataUrl !== 'string') {
+      return false
+    }
+
+    // Must be a PNG data URL
+    if (!dataUrl.startsWith('data:image/png;base64,')) {
+      return false
+    }
+
+    // Extract and validate base64 portion
+    const base64Part = dataUrl.split(',')[1]
+    if (!base64Part) {
+      return false
+    }
+
+    // Validate base64 characters (A-Z, a-z, 0-9, +, /, =)
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64Part)) {
+      return false
+    }
+
+    // Check length is reasonable for QR code PNG (prevent extremely large payloads)
+    if (base64Part.length > 100000) { // ~75KB max for base64 encoded image
+      return false
+    }
+
+    // Additional safety: try to validate it's actually valid base64
+    try {
+      atob(base64Part)
+    } catch (error) {
+      return false
+    }
+
+    return true
   }
 
   const formatDate = (date: Date) => {
@@ -298,22 +368,40 @@ export function SharesList({ shares, loading, onEdit, onDelete, onToggleStatus }
               </p>
               
               <div className="bg-white p-4 rounded-lg mb-4 inline-block">
-                <img
-                  src={qrCodeUrl}
-                  alt="QR Code"
-                  className="w-48 h-48"
-                />
+                {/* Only render image if QR code URL passes comprehensive validation */}
+                {qrCodeUrl && isValidQRCodeDataUrl(qrCodeUrl) ? (
+                  <img
+                    src={qrCodeUrl}
+                    alt="QR Code"
+                    className="w-48 h-48"
+                    onError={() => {
+                      console.error('QR code image failed to load')
+                      setQrCodeUrl('')
+                      setQrModalShare(null)
+                    }}
+                  />
+                ) : (
+                  <div className="w-48 h-48 flex items-center justify-center text-gray-500">
+                    Failed to generate QR code
+                  </div>
+                )}
               </div>
               
               <div className="text-xs text-muted-foreground mb-4 break-all">
-                {qrModalShare.shareUrl}
+                {/* Safely display URL by escaping any HTML characters */}
+                <span title="Share URL">{qrModalShare.shareUrl}</span>
               </div>
               
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => copyToClipboard(qrCodeUrl, 'qr')}
+                  onClick={() => {
+                    // Validate QR code URL before copying
+                    if (qrCodeUrl && qrCodeUrl.startsWith('data:image/png;base64,')) {
+                      copyToClipboard(qrCodeUrl, 'qr')
+                    }
+                  }}
                   className="flex-1"
                 >
                   {copiedId === 'qr' ? 'Copied!' : 'Copy QR'}

@@ -4,6 +4,7 @@
 const express = require('express');
 const router = express.Router();
 const DockerDiscoveryService = require('../services/dockerDiscovery');
+const crypto = require('crypto');
 
 // Initialize discovery service
 const discoveryService = new DockerDiscoveryService();
@@ -59,7 +60,7 @@ router.post('/import', async (req, res) => {
             groupId = existingGroup.id;
           } else {
             // Generate a unique ID for the group
-            groupId = `docker-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            groupId = `docker-${Date.now()}-${crypto.randomBytes(6).toString('hex')}`;
             await req.db.run(
               'INSERT INTO groups (id, name, icon, color, description, created_at) VALUES (?, ?, ?, ?, ?, ?)',
               [

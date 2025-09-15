@@ -4,6 +4,7 @@
 const express = require('express');
 const router = express.Router();
 const { body, param, query, validationResult } = require('express-validator');
+const crypto = require('crypto');
 
 // Validation middleware
 const handleValidationErrors = (req, res, next) => {
@@ -195,7 +196,7 @@ router.post('/share/:uid/overlay',
       }
 
       // Save or update overlay
-      const overlayId = `overlay-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const overlayId = `overlay-${Date.now()}-${crypto.randomBytes(6).toString('hex')}`;
       
       await req.db.run(`
         INSERT OR REPLACE INTO personal_overlays (
@@ -295,7 +296,7 @@ router.post('/share/:uid/bookmark',
       `, [sharedView.id, sessionId]);
 
       if (!overlay) {
-        const overlayId = `overlay-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const overlayId = `overlay-${Date.now()}-${crypto.randomBytes(6).toString('hex')}`;
         await req.db.run(`
           INSERT INTO personal_overlays (
             id, shared_view_id, session_id, notes, hidden_bookmarks, custom_order, custom_bookmarks
@@ -311,7 +312,7 @@ router.post('/share/:uid/bookmark',
       // Add bookmark to custom bookmarks
       const customBookmarks = JSON.parse(overlay.custom_bookmarks || '[]');
       const newBookmark = {
-        id: `custom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `custom-${Date.now()}-${crypto.randomBytes(6).toString('hex')}`,
         title,
         url,
         description: description || '',

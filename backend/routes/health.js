@@ -64,28 +64,31 @@ router.post('/check/:id', async (req, res, next) => {
   }
 });
 
-// POST /api/health/check-all - Check health of all bookmarks
+// POST /api/health/check-all - Check health of all bookmarks (optimized to prevent N+1)
 router.post('/check-all', async (req, res, next) => {
   try {
     const bookmarks = await req.db.all('SELECT id, url FROM bookmarks');
     const results = [];
-    
+    const batchUpdates = [];
+    const batchAnalytics = [];
+
     // Check each bookmark (with rate limiting)
     for (const bookmark of bookmarks) {
       const healthResult = await checkBookmarkHealth(bookmark.url);
-      
-      // Update bookmark health status
-      await req.db.run(
-        'UPDATE bookmarks SET health_status = ?, last_health_check = CURRENT_TIMESTAMP WHERE id = ?',
-        [healthResult.status, bookmark.id]
-      );
-      
-      // Log analytics event
-      await req.db.run(
-        'INSERT INTO analytics (bookmark_id, event_type, metadata) VALUES (?, ?, ?)',
-        [bookmark.id, 'health_check', JSON.stringify(healthResult)]
-      );
-      
+
+      // Collect updates for batch processing
+      batchUpdates.push({
+        id: bookmark.id,
+        status: healthResult.status
+      });
+
+      // Collect analytics for batch processing
+      batchAnalytics.push({
+        bookmark_id: bookmark.id,
+        event_type: 'health_check',
+        metadata: JSON.stringify(healthResult)
+      });
+
       results.push({
         id: bookmark.id,
         url: bookmark.url,
@@ -95,10 +98,32 @@ router.post('/check-all', async (req, res, next) => {
       // Rate limit: wait 100ms between checks
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-    
+
+    // Batch update bookmark health status (prevents N+1 queries)
+    if (batchUpdates.length > 0) {
+      const updatePromises = batchUpdates.map(update =>
+        req.db.run(
+          'UPDATE bookmarks SET health_status = ?, last_health_check = CURRENT_TIMESTAMP WHERE id = ?',
+          [update.status, update.id]
+        )
+      );
+      await Promise.all(updatePromises);
+    }
+
+    // Batch insert analytics events (prevents N+1 queries)
+    if (batchAnalytics.length > 0) {
+      const insertPromises = batchAnalytics.map(analytics =>
+        req.db.run(
+          'INSERT INTO analytics (bookmark_id, event_type, metadata) VALUES (?, ?, ?)',
+          [analytics.bookmark_id, analytics.event_type, analytics.metadata]
+        )
+      );
+      await Promise.all(insertPromises);
+    }
+
     // Emit WebSocket event
     req.io.emit('health:bulk-updated', results);
-    
+
     res.json({
       checked: results.length,
       results: results

@@ -5,15 +5,12 @@ const express = require('express');
 const router = express.Router();
 const { body, param, query, validationResult } = require('express-validator');
 const crypto = require('crypto');
-
-// Validation middleware
-const handleValidationErrors = (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-  next();
-};
+const { authMiddleware, checkResourceOwnership, requireAdmin } = require('../middleware/auth');
+const {
+  validationChains,
+  shareValidation,
+  handleValidationErrors
+} = require('../middleware/validation');
 
 // Generate unique 8-character UID for public sharing using cryptographically secure random
 function generateShareUID() {
@@ -35,6 +32,8 @@ function generateId(prefix = '') {
 
 // GET /api/shares - List all shared views
 router.get('/',
+  authMiddleware,
+  requireAdmin,
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('offset').optional().isInt({ min: 0 }),
   handleValidationErrors,
@@ -81,23 +80,9 @@ router.get('/',
 
 // POST /api/shares - Create new shared view
 router.post('/',
-  body('name').notEmpty().trim().isLength({ max: 255 }),
-  body('description').optional().trim(),
-  body('access_type').optional().isIn(['public', 'restricted', 'expiring']),
-  body('expires_at').optional().isISO8601(),
-  body('max_uses').optional().isInt({ min: 1 }),
-  body('included_groups').optional().isArray(),
-  body('excluded_groups').optional().isArray(),
-  body('included_tags').optional().isArray(),
-  body('excluded_tags').optional().isArray(),
-  body('theme').optional().isIn(['light', 'dark', 'auto']),
-  body('layout').optional().isIn(['card', 'list', 'compact']),
-  body('show_groups').optional().isBoolean(),
-  body('show_search').optional().isBoolean(),
-  body('show_filters').optional().isBoolean(),
-  body('custom_css').optional().trim(),
-  body('custom_branding').optional().isObject(),
-  handleValidationErrors,
+  authMiddleware,
+  requireAdmin,
+  shareValidation,
   async (req, res, next) => {
     try {
       const {
@@ -183,6 +168,8 @@ router.post('/',
 
 // GET /api/shares/:id - Get specific shared view (by internal ID)
 router.get('/:id',
+  authMiddleware,
+  requireAdmin,
   param('id').notEmpty(),
   handleValidationErrors,
   async (req, res, next) => {
@@ -227,23 +214,26 @@ router.get('/:id',
 
 // PUT /api/shares/:id - Update shared view
 router.put('/:id',
+  authMiddleware,
+  requireAdmin,
   param('id').notEmpty(),
-  body('name').optional().trim().isLength({ max: 255 }),
-  body('description').optional().trim(),
-  body('access_type').optional().isIn(['public', 'restricted', 'expiring']),
-  body('expires_at').optional(),
-  body('max_uses').optional(),
-  body('included_groups').optional().isArray(),
-  body('excluded_groups').optional().isArray(),
-  body('included_tags').optional().isArray(),
-  body('excluded_tags').optional().isArray(),
-  body('theme').optional().isIn(['light', 'dark', 'auto']),
-  body('layout').optional().isIn(['card', 'list', 'compact']),
-  body('show_groups').optional().isBoolean(),
-  body('show_search').optional().isBoolean(),
-  body('show_filters').optional().isBoolean(),
-  body('custom_css').optional().trim(),
-  body('custom_branding').optional(),
+  // Use shareValidation with all fields optional for updates
+  validationChains.name(false),
+  validationChains.description(false),
+  validationChains.access_type(),
+  validationChains.expires_at(),
+  validationChains.max_uses(),
+  validationChains.included_groups(),
+  validationChains.excluded_groups(),
+  validationChains.included_tags(),
+  validationChains.excluded_tags(),
+  validationChains.theme(),
+  validationChains.layout(),
+  validationChains.show_groups(),
+  validationChains.show_search(),
+  validationChains.show_filters(),
+  validationChains.custom_css(),
+  validationChains.custom_branding(),
   handleValidationErrors,
   async (req, res, next) => {
     try {
@@ -328,6 +318,8 @@ router.put('/:id',
 
 // DELETE /api/shares/:id - Delete shared view
 router.delete('/:id',
+  authMiddleware,
+  requireAdmin,
   param('id').notEmpty(),
   handleValidationErrors,
   async (req, res, next) => {
