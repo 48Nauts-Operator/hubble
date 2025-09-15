@@ -39,6 +39,12 @@ export interface BookmarkGroup {
 export type SortOption = 'alphabetical' | 'mostClicked' | 'recent' | 'oldest'
 export type FilterOption = 'all' | 'development' | 'staging' | 'production' | 'uat' | 'local'
 
+// Memoization cache for filtered bookmarks
+interface BookmarkCache {
+  key: string
+  result: Bookmark[]
+}
+
 interface BookmarkStore {
   // State
   bookmarks: Bookmark[]
@@ -50,7 +56,10 @@ interface BookmarkStore {
   sortBy: SortOption
   filterBy: FilterOption
   breadcrumbs: { id: string | null; name: string }[]
-  
+
+  // Internal cache for memoization
+  _filteredBookmarksCache: BookmarkCache | null
+
   // Actions
   setBookmarks: (bookmarks: Bookmark[]) => void
   setGroups: (groups: BookmarkGroup[]) => void
@@ -69,7 +78,10 @@ interface BookmarkStore {
   setBreadcrumbs: (breadcrumbs: { id: string | null; name: string }[]) => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
-  
+
+  // Internal helper to clear cache
+  _clearFilterCache: () => void
+
   // Computed
   filteredBookmarks: () => Bookmark[]
   getBookmarksByGroup: (groupId: string) => Bookmark[]
@@ -90,26 +102,39 @@ export const useBookmarkStore = create<BookmarkStore>()(
       sortBy: 'alphabetical' as SortOption,
       filterBy: 'all' as FilterOption,
       breadcrumbs: [{ id: null, name: 'Home' }],
+      _filteredBookmarksCache: null,
       
+      // Internal helper to clear cache
+      _clearFilterCache: () => set({ _filteredBookmarksCache: null }),
+
       // Actions
-      setBookmarks: (bookmarks) => set({ bookmarks: Array.isArray(bookmarks) ? bookmarks : [] }),
-      setGroups: (groups) => set({ groups: Array.isArray(groups) ? groups : [] }),
+      setBookmarks: (bookmarks) => set({
+        bookmarks: Array.isArray(bookmarks) ? bookmarks : [],
+        _filteredBookmarksCache: null // Clear cache when bookmarks change
+      }),
+      setGroups: (groups) => set({
+        groups: Array.isArray(groups) ? groups : [],
+        _filteredBookmarksCache: null // Clear cache when groups change
+      }),
       
-      addBookmark: (bookmark) => 
-        set((state) => ({ 
-          bookmarks: [...state.bookmarks, bookmark] 
+      addBookmark: (bookmark) =>
+        set((state) => ({
+          bookmarks: [...state.bookmarks, bookmark],
+          _filteredBookmarksCache: null
         })),
       
       updateBookmark: (id, updatedBookmark) =>
         set((state) => ({
           bookmarks: state.bookmarks.map((bookmark) =>
             bookmark.id === id ? { ...bookmark, ...updatedBookmark } : bookmark
-          )
+          ),
+          _filteredBookmarksCache: null
         })),
       
       deleteBookmark: (id) =>
         set((state) => ({
-          bookmarks: state.bookmarks.filter((bookmark) => bookmark.id !== id)
+          bookmarks: state.bookmarks.filter((bookmark) => bookmark.id !== id),
+          _filteredBookmarksCache: null
         })),
       
       incrementClickCount: (bookmarkId) =>
@@ -118,7 +143,8 @@ export const useBookmarkStore = create<BookmarkStore>()(
             bookmark.id === bookmarkId
               ? { ...bookmark, clickCount: bookmark.clickCount + 1, lastClicked: new Date() }
               : bookmark
-          )
+          ),
+          _filteredBookmarksCache: null
         })),
       
       addGroup: (group) =>
@@ -149,30 +175,47 @@ export const useBookmarkStore = create<BookmarkStore>()(
           }
         }),
       
-      setSearchQuery: (searchQuery) => set({ searchQuery }),
-      setSelectedGroupId: (selectedGroupId) => set({ selectedGroupId }),
-      setSortBy: (sortBy) => set({ sortBy }),
-      setFilterBy: (filterBy) => set({ filterBy }),
+      setSearchQuery: (searchQuery) => set({ searchQuery, _filteredBookmarksCache: null }),
+      setSelectedGroupId: (selectedGroupId) => set({ selectedGroupId, _filteredBookmarksCache: null }),
+      setSortBy: (sortBy) => set({ sortBy, _filteredBookmarksCache: null }),
+      setFilterBy: (filterBy) => set({ filterBy, _filteredBookmarksCache: null }),
       setBreadcrumbs: (breadcrumbs) => set({ breadcrumbs }),
       setLoading: (loading) => set({ loading }),
       setError: (error) => set({ error }),
       
-      // Computed getters
+      // Computed getters with memoization
       filteredBookmarks: () => {
-        const { bookmarks, groups, searchQuery, selectedGroupId, sortBy, filterBy } = get()
-        
+        const state = get()
+        const { bookmarks, groups, searchQuery, selectedGroupId, sortBy, filterBy, _filteredBookmarksCache } = state
+
+        // Create cache key from relevant state
+        const cacheKey = JSON.stringify({
+          bookmarksLength: bookmarks.length,
+          bookmarksIds: bookmarks.map(b => `${b.id}-${b.clickCount}-${b.updatedAt}`).join(','),
+          groupsLength: groups.length,
+          searchQuery,
+          selectedGroupId,
+          sortBy,
+          filterBy
+        })
+
+        // Return cached result if key matches
+        if (_filteredBookmarksCache && _filteredBookmarksCache.key === cacheKey) {
+          return _filteredBookmarksCache.result
+        }
+
         // Ensure bookmarks is an array
         if (!Array.isArray(bookmarks)) {
           console.warn('Bookmarks is not an array:', bookmarks)
           return []
         }
-        
+
         let filtered = [...bookmarks] // Create a copy to avoid mutating state
-        
-        // Find the Documentation group ID
+
+        // Find the Documentation group ID (cache this lookup)
         const documentationGroup = groups.find(g => g.name === 'Documentation')
         const documentationGroupId = documentationGroup?.id
-        
+
         if (selectedGroupId) {
           // If a specific group is selected, show only that group's bookmarks
           filtered = filtered.filter(bookmark => bookmark.groupId === selectedGroupId)
@@ -182,11 +225,11 @@ export const useBookmarkStore = create<BookmarkStore>()(
             filtered = filtered.filter(bookmark => bookmark.groupId !== documentationGroupId)
           }
         }
-        
+
         if (filterBy !== 'all') {
           filtered = filtered.filter(bookmark => bookmark.environment === filterBy)
         }
-        
+
         if (searchQuery) {
           const query = searchQuery.toLowerCase()
           filtered = filtered.filter(bookmark =>
@@ -196,7 +239,7 @@ export const useBookmarkStore = create<BookmarkStore>()(
             bookmark.tags.some(tag => tag.toLowerCase().includes(query))
           )
         }
-        
+
         // Sort bookmarks
         filtered.sort((a, b) => {
           switch (sortBy) {
@@ -212,7 +255,10 @@ export const useBookmarkStore = create<BookmarkStore>()(
               return 0
           }
         })
-        
+
+        // Cache the result
+        set({ _filteredBookmarksCache: { key: cacheKey, result: filtered } })
+
         return filtered
       },
       

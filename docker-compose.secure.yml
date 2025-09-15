@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # Docker socket proxy - provides read-only access to Docker API
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: hubble-docker-proxy
+    environment:
+      - CONTAINERS=1
+      - NETWORKS=1
+      - INFO=1
+      - IMAGES=1
+      - EVENTS=1
+      - AUTH=0
+      - SECRETS=0
+      - BUILD=0
+      - COMMIT=0
+      - CONFIGS=0
+      - DISTRIBUTION=0
+      - EXEC=0
+      - PLUGINS=0
+      - POST=0
+      - SWARM=0
+      - SYSTEM=0
+      - TASKS=0
+      - VOLUMES=0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - hubble-network
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: hubble-frontend
+    ports:
+      - "8888:3000"
+    environment:
+      - REACT_APP_API_URL=http://rufus.blockonauts.io:8889
+      - REACT_APP_MCP_URL=http://rufus.blockonauts.io:9900
+      - NODE_ENV=production
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - hubble-network
+    depends_on:
+      - backend
+
+  backend:
+    build: ./backend
+    container_name: hubble-backend
+    ports:
+      - "8889:5000"
+    environment:
+      - DATABASE_URL=/data/hubble.db
+      - MCP_SERVER_URL=http://mcp-server:9900
+      - NODE_ENV=production
+      - PORT=5000
+      # Use docker-proxy instead of direct socket access
+      - DOCKER_HOST=tcp://docker-proxy:2375
+    volumes:
+      - ./backend:/app
+      - ./data:/data
+      - /app/node_modules
+      # Remove direct Docker socket mount
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - hubble-network
+    depends_on:
+      - mcp-server
+      - docker-proxy
+
+  mcp-server:
+    build: ./mcp-server
+    container_name: hubble-mcp
+    ports:
+      - "9900:9900"
+    environment:
+      - DATABASE_URL=/data/hubble.db
+      - NODE_ENV=production
+      - PORT=9900
+    volumes:
+      - ./mcp-server:/app
+      - ./data:/data
+      - /app/node_modules
+    networks:
+      - hubble-network
+
+networks:
+  hubble-network:
+    driver: bridge

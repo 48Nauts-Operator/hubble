@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { bookmarkApi } from '@/services/api'
-import { useBookmarkStore, type BookmarkGroup } from '@/stores/useBookmarkStore'
+import { useBookmarkStore, type BookmarkGroup, type Environment } from '@/stores/useBookmarkStore'
 import { validateBookmarkForm, type BookmarkFormData } from '@/utils/validation'
 
 export interface AddBookmarkModalProps {
@@ -80,7 +80,10 @@ export function AddBookmarkModal({ isOpen, onClose, groups }: AddBookmarkModalPr
         groupId: groupId || groups[0]?.id,
         tags: validation.sanitizedData.tags ? validation.sanitizedData.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
         icon: validation.sanitizedData.icon,
-        environment: validation.sanitizedData.environment as any,
+        environment: (validation.sanitizedData.environment &&
+          ['development', 'staging', 'production', 'uat', 'local'].includes(validation.sanitizedData.environment)
+          ? validation.sanitizedData.environment as Environment
+          : 'production'),
         clickCount: 0
       })
       

@@ -27,15 +27,15 @@ class HubbleHttpMCP {
 
   initDatabase() {
     const dbPath = process.env.DATABASE_URL || '/data/hubble.db';
-    
+
     try {
       // Ensure directory exists
       const dir = path.dirname(dbPath);
       require('fs').mkdirSync(dir, { recursive: true });
-      
+
       this.db = new Database(dbPath);
       this.ensureSchema();
-      
+
       console.log(`Hubble MCP connected to database: ${dbPath}`);
     } catch (error) {
       console.error('Database initialization error:', error);
@@ -75,7 +75,7 @@ class HubbleHttpMCP {
 
     // Ensure default group
     const insert = this.db.prepare(
-      `INSERT OR IGNORE INTO groups (id, name, icon, description) 
+      `INSERT OR IGNORE INTO groups (id, name, icon, description)
        VALUES (?, ?, ?, ?)`
     );
     insert.run('default', 'Uncategorized', '📁', 'Default group for bookmarks');
