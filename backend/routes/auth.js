@@ -288,7 +288,11 @@ router.post('/logout', csrfProtection, async (req, res, next) => {
 // Note: No CSRF protection needed as this is just checking status, not changing state
 router.post('/verify', async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
+    // Check for token in cookie first, then authorization header (for backward compatibility)
+    const cookieToken = req.cookies?.auth_token;
+    const headerToken = req.headers.authorization?.replace('Bearer ', '');
+    const token = cookieToken || headerToken;
+
     if (!token) {
       return res.status(401).json({ valid: false });
     }
