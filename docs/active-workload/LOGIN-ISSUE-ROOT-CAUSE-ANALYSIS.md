@@ -111,6 +111,14 @@ The "p1 is not defined" console error was traced to:
 - Resolved by rebuilding frontend with proper production build
 - No functional impact on application
 
+### Groups Display Issue
+**Symptom**: Groups sidebar showing "No groups yet" despite groups existing in database
+**Root Cause**:
+- Database stores `parent_id` as `null` for top-level groups
+- Frontend transformation converted `null` to `undefined`
+- `getSubgroups(null)` comparison failed (`undefined !== null`)
+**Fix Applied**: Changed api.ts to preserve `null` values for parentId
+
 ### Final Status
 ✅ Authentication fully functional
 ✅ CSRF protection working with fallback strategies
@@ -118,6 +126,7 @@ The "p1 is not defined" console error was traced to:
 ✅ Cookies setting correctly across environments
 ✅ Frontend TypeScript compilation successful
 ✅ Production build optimized and deployed
+✅ Groups displaying correctly in sidebar
 
 ---
 
