@@ -192,7 +192,7 @@ function transformGroup(backendGroup: any): BookmarkGroup {
     description: backendGroup.description ? String(backendGroup.description) : undefined,
     icon: String(backendGroup.icon || '📁'),
     color: String(backendGroup.color || '#d946ef'),
-    parentId: backendGroup.parent_id ? String(backendGroup.parent_id) : undefined,
+    parentId: backendGroup.parent_id || null, // Keep null for top-level groups instead of undefined
     bookmarks: [], // Will be populated separately
     subgroups: [], // Will be populated separately
     createdAt: safeCreateDate(backendGroup.created_at),
