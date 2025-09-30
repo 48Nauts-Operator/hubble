@@ -7,6 +7,7 @@ const express = require('express');
 const Database = require('better-sqlite3');
 const path = require('path');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 
 class HubbleHttpMCP {
   constructor() {
@@ -17,6 +18,20 @@ class HubbleHttpMCP {
   }
 
   setupMiddleware() {
+    // Rate limiting for MCP endpoints
+    const mcpLimiter = rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      max: 500, // Limit each IP to 500 requests per 15 minutes
+      message: {
+        error: 'Too many requests from this IP, please try again later.',
+        retryAfter: '15 minutes'
+      },
+      standardHeaders: true,
+      legacyHeaders: false,
+      validate: { xForwardedForHeader: false }
+    });
+
+    this.app.use(mcpLimiter);
     this.app.use(cors());
     this.app.use(express.json());
     this.app.use((req, res, next) => {

@@ -126,8 +126,16 @@ router.post('/setup',
       // Hash password
       const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
-      // Generate JWT secret
-      const jwtSecret = generateSecureToken();
+      // Generate JWT secret - prefer environment variable, fallback to generated
+      // Use minimum 64 bytes (512 bits) for cryptographic security
+      const jwtSecret = process.env.JWT_SECRET || generateSecureToken(64);
+
+      // Validate JWT secret has sufficient entropy (minimum 32 bytes = 256 bits)
+      if (jwtSecret.length < 64) {
+        return res.status(400).json({
+          error: 'JWT secret must be at least 64 characters for security'
+        });
+      }
 
       // Save configuration
       await req.db.run(`
@@ -135,8 +143,10 @@ router.post('/setup',
         VALUES (1, ?, ?, ?, 1)
       `, [passwordHash, email || null, jwtSecret]);
 
-      // Set environment variables for current session
-      process.env.JWT_SECRET = jwtSecret;
+      // Set environment variables for current session (if not already set)
+      if (!process.env.JWT_SECRET) {
+        process.env.JWT_SECRET = jwtSecret;
+      }
 
       // Generate initial token for immediate login
       const token = jwt.sign(
