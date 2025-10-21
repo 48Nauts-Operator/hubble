@@ -7,6 +7,7 @@ const express = require('express');
 const Database = require('better-sqlite3');
 const path = require('path');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 
 class HubbleHttpMCP {
   constructor() {
@@ -17,6 +18,20 @@ class HubbleHttpMCP {
   }
 
   setupMiddleware() {
+    // Rate limiting for MCP endpoints
+    const mcpLimiter = rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      max: 500, // Limit each IP to 500 requests per 15 minutes
+      message: {
+        error: 'Too many requests from this IP, please try again later.',
+        retryAfter: '15 minutes'
+      },
+      standardHeaders: true,
+      legacyHeaders: false,
+      validate: { xForwardedForHeader: false }
+    });
+
+    this.app.use(mcpLimiter);
     this.app.use(cors());
     this.app.use(express.json());
     this.app.use((req, res, next) => {
@@ -27,15 +42,15 @@ class HubbleHttpMCP {
 
   initDatabase() {
     const dbPath = process.env.DATABASE_URL || '/data/hubble.db';
-    
+
     try {
       // Ensure directory exists
       const dir = path.dirname(dbPath);
       require('fs').mkdirSync(dir, { recursive: true });
-      
+
       this.db = new Database(dbPath);
       this.ensureSchema();
-      
+
       console.log(`Hubble MCP connected to database: ${dbPath}`);
     } catch (error) {
       console.error('Database initialization error:', error);
@@ -75,7 +90,7 @@ class HubbleHttpMCP {
 
     // Ensure default group
     const insert = this.db.prepare(
-      `INSERT OR IGNORE INTO groups (id, name, icon, description) 
+      `INSERT OR IGNORE INTO groups (id, name, icon, description)
        VALUES (?, ?, ?, ?)`
     );
     insert.run('default', 'Uncategorized', '📁', 'Default group for bookmarks');

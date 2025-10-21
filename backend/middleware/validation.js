@@ -16,40 +16,108 @@ const getCachedValidation = (key, createChain) => {
 
 // Common field validation chains
 const validationChains = {
-  // Text fields
+  // Text fields with XSS protection
   name: (required = true, maxLength = 255) => {
-    const chain = body('name').trim().isLength({ max: maxLength });
+    const chain = body('name')
+      .trim()
+      .isLength({ min: 1, max: maxLength })
+      .matches(/^[a-zA-Z0-9\s\-_.()\[\]{}@#&]+$/)
+      .withMessage('Name contains invalid characters');
     return required ? chain.notEmpty() : chain.optional();
   },
 
   description: (required = false, maxLength = 1000) => {
-    const chain = body('description').trim().isLength({ max: maxLength });
+    const chain = body('description')
+      .trim()
+      .isLength({ max: maxLength })
+      .escape(); // Escape HTML to prevent XSS
     return required ? chain.notEmpty() : chain.optional();
   },
 
   title: (required = true, maxLength = 255) => {
-    const chain = body('title').trim().isLength({ max: maxLength });
+    const chain = body('title')
+      .trim()
+      .isLength({ min: 1, max: maxLength })
+      .escape(); // Escape HTML to prevent XSS
     return required ? chain.notEmpty() : chain.optional();
   },
 
-  // URL fields
+  // URL fields with protocol whitelisting for security
   url: (required = true) => {
-    const chain = body('url').isURL();
+    const chain = body('url')
+      .isURL({
+        protocols: ['http', 'https'],
+        require_protocol: true,
+        require_valid_protocol: true
+      })
+      .custom(value => {
+        // Additional security: block dangerous protocols
+        const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:'];
+        const lowerValue = value?.toLowerCase() || '';
+        for (const protocol of dangerousProtocols) {
+          if (lowerValue.startsWith(protocol)) {
+            throw new Error(`Dangerous protocol ${protocol} not allowed`);
+          }
+        }
+        return true;
+      });
     return required ? chain.notEmpty() : chain.optional();
   },
 
-  internal_url: () => body('internal_url').optional().isURL(),
-  external_url: () => body('external_url').optional().isURL(),
+  internal_url: () => body('internal_url').optional()
+    .isURL({
+      protocols: ['http', 'https'],
+      require_protocol: true,
+      require_valid_protocol: true
+    })
+    .custom(value => {
+      if (!value) return true;
+      const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:'];
+      const lowerValue = value.toLowerCase();
+      for (const protocol of dangerousProtocols) {
+        if (lowerValue.startsWith(protocol)) {
+          throw new Error(`Dangerous protocol ${protocol} not allowed`);
+        }
+      }
+      return true;
+    }),
+
+  external_url: () => body('external_url').optional()
+    .isURL({
+      protocols: ['http', 'https'],
+      require_protocol: true,
+      require_valid_protocol: true
+    })
+    .custom(value => {
+      if (!value) return true;
+      const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:'];
+      const lowerValue = value.toLowerCase();
+      for (const protocol of dangerousProtocols) {
+        if (lowerValue.startsWith(protocol)) {
+          throw new Error(`Dangerous protocol ${protocol} not allowed`);
+        }
+      }
+      return true;
+    }),
 
   // Common optional fields
   icon: (maxLength = 200) => body('icon').optional().trim().isLength({ max: maxLength }),
   color: () => body('color').optional().matches(/^#[0-9A-Fa-f]{6}$/),
   tags: () => body('tags').optional().isArray(),
   
-  // ID fields
-  group_id: () => body('group_id').optional().isString().trim(),
+  // ID fields with format validation
+  group_id: () => body('group_id')
+    .optional()
+    .isString()
+    .trim()
+    .matches(/^[a-zA-Z0-9_-]+$/)
+    .withMessage('Invalid group ID format'),
   parent_id: () => body('parent_id').optional(),
-  session_id: () => body('session_id').notEmpty().trim(),
+  session_id: () => body('session_id')
+    .notEmpty()
+    .trim()
+    .matches(/^[a-zA-Z0-9_-]+$/)
+    .withMessage('Invalid session ID format'),
 
   // Enumeration fields
   environment: () => body('environment').optional().isIn(['production', 'staging', 'uat', 'development', 'local']),
@@ -89,15 +157,43 @@ const validationChains = {
   custom_branding: () => body('custom_branding').optional().isObject(),
   notes: () => body('notes').optional().isObject(),
 
-  // Auth fields
+  // Auth fields with strong validation
   password: (required = true) => {
-    const chain = body('password').isLength({ min: 8, max: 128 });
+    const chain = body('password')
+      .isLength({ min: 8, max: 128 })
+      .withMessage('Password must be between 8 and 128 characters')
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])/)
+      .withMessage('Password must contain at least one lowercase, uppercase, number, and special character');
     return required ? chain.notEmpty() : chain.optional();
   },
-  email: () => body('email').optional().isEmail(),
+  email: () => body('email')
+    .optional()
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Invalid email format'),
 
   // Special fields
-  custom_css: () => body('custom_css').optional().trim(),
+  custom_css: () => body('custom_css')
+    .optional()
+    .trim()
+    .custom(value => {
+      if (!value) return true;
+      // Block dangerous CSS patterns
+      const dangerous = [
+        'javascript:',
+        'expression(',
+        '@import',
+        '</style>',
+        '<script'
+      ];
+      const lowerValue = value.toLowerCase();
+      for (const pattern of dangerous) {
+        if (lowerValue.includes(pattern)) {
+          throw new Error(`Dangerous CSS pattern detected: ${pattern}`);
+        }
+      }
+      return true;
+    }),
   health_status: () => body('health_status').optional().isIn(['unknown', 'healthy', 'unhealthy', 'timeout'])
 };
 

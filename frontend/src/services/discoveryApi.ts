@@ -2,6 +2,7 @@
 // ABOUTME: Handles scanning, preview, and importing of discovered containers
 
 import { authService } from './authApi'
+import { environmentService } from '@/config/environment'
 
 // Note: ApiResponse type will be defined inline
 
@@ -11,10 +12,8 @@ interface ApiResponse {
   error?: string;
 }
 
-// Use the same URL pattern as the main API service
-const API_BASE = window.location.hostname === 'localhost' 
-  ? 'http://localhost:8889'
-  : '';
+// Get API base URL from environment configuration
+const API_BASE = environmentService.getApiBaseUrl().replace('/api', '');
 
 export interface DiscoveredService {
   id: string;

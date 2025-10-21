@@ -6,6 +6,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
 const { 
   userWriteLimiter, 
   userReadLimiter, 
@@ -29,6 +30,7 @@ const backupRoutes = require('./routes/backup');
 const shareAdminRoutes = require('./routes/shares-admin');
 const sharePublicRoutes = require('./routes/shares-public');
 const authRoutes = require('./routes/auth');
+const faviconRoutes = require('./routes/favicon');
 
 // Import middleware
 const { authMiddleware } = require('./middleware/auth');
@@ -157,6 +159,7 @@ app.use(generalLimiter);
 // Extract user info for rate limiting (before route-specific limits)
 app.use(extractUserForRateLimit);
 
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined'));
@@ -195,11 +198,24 @@ app.use((req, res, next) => {
   next();
 });
 
-// Auth routes (with strict rate limiting)
-app.use('/api/auth', userAuthLimiter, authRoutes);
+// Auth routes - apply rate limiting selectively
+// Status checks need less restrictive rate limiting as they're called frequently
+app.use('/api/auth/status', generalLimiter, authRoutes);
+app.use('/api/auth/verify', generalLimiter, authRoutes);
+
+// Login/setup need strict rate limiting to prevent brute force
+app.use('/api/auth/login', userAuthLimiter, authRoutes);
+app.use('/api/auth/setup', userAuthLimiter, authRoutes);
+app.use('/api/auth/logout', generalLimiter, authRoutes);
+
+// Fallback for any other auth routes
+app.use('/api/auth', authRoutes);
 
 // Public share routes (no auth required, moderate limiting)
 app.use('/api/public', sharePublicRoutes);
+
+// Favicon proxy route (public but rate limited)
+app.use('/api/favicon', userReadLimiter, faviconRoutes);
 
 // Apply auth middleware to all protected routes
 app.use(authMiddleware);

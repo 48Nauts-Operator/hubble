@@ -1,11 +1,9 @@
 // ABOUTME: Authentication API service for login, setup, and session management
 // ABOUTME: Handles JWT token storage and auth state management
 
-const API_BASE_URL = window.location.hostname === 'localhost' 
-  ? 'http://localhost:8889/api'
-  : '/api'
+import { environmentService } from '@/config/environment'
 
-const TOKEN_KEY = 'hubble_auth_token'
+const API_BASE_URL = environmentService.getApiBaseUrl()
 
 export interface AuthStatus {
   enabled: boolean
@@ -15,8 +13,7 @@ export interface AuthStatus {
 
 export interface LoginResponse {
   success: boolean
-  token: string
-  expiresAt: string
+  expiresAt?: string
 }
 
 export interface SetupRequest {
@@ -25,33 +22,22 @@ export interface SetupRequest {
 }
 
 class AuthService {
-  private token: string | null = null
+  private authenticated: boolean = false
 
   constructor() {
-    // Load token from localStorage on init
-    this.token = localStorage.getItem(TOKEN_KEY)
+    // Authentication state will be determined by server response
+    // Cookies are handled automatically by the browser
+    this.authenticated = false
   }
 
-  // Get stored token
-  getToken(): string | null {
-    return this.token
-  }
-
-  // Set token and store in localStorage
-  setToken(token: string): void {
-    this.token = token
-    localStorage.setItem(TOKEN_KEY, token)
-  }
-
-  // Clear token
-  clearToken(): void {
-    this.token = null
-    localStorage.removeItem(TOKEN_KEY)
-  }
-
-  // Check if user is authenticated
+  // Check if user is authenticated (will be set after successful API calls)
   isAuthenticated(): boolean {
-    return !!this.token
+    return this.authenticated
+  }
+
+  // Set authentication state
+  setAuthenticated(value: boolean): void {
+    this.authenticated = value
   }
 
   // Get auth headers for API requests
@@ -61,16 +47,15 @@ class AuthService {
       'X-Requested-With': 'XMLHttpRequest'
     }
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`
-    }
-
+    // Cookies are sent automatically, no need for Authorization header
     return headers
   }
 
   // Check auth status (enabled/configured)
   async checkStatus(): Promise<AuthStatus> {
-    const response = await fetch(`${API_BASE_URL}/auth/status`)
+    const response = await fetch(`${API_BASE_URL}/auth/status`, {
+      credentials: 'include' // Include cookies
+    })
     if (!response.ok) {
       throw new Error('Failed to check auth status')
     }
@@ -81,21 +66,22 @@ class AuthService {
   async setup(data: SetupRequest): Promise<LoginResponse> {
     const response = await fetch(`${API_BASE_URL}/auth/setup`, {
       method: 'POST',
+      credentials: 'include', // Include cookies
       headers: {
         'Content-Type': 'application/json',
         'X-Requested-With': 'XMLHttpRequest'
       },
       body: JSON.stringify(data)
     })
-    
+
     if (!response.ok) {
       const error = await response.json()
       throw new Error(error.error || 'Setup failed')
     }
-    
+
     const result = await response.json()
-    if (result.token) {
-      this.setToken(result.token)
+    if (result.success) {
+      this.setAuthenticated(true)
     }
     return result
   }
@@ -104,63 +90,74 @@ class AuthService {
   async login(password: string, remember: boolean = false): Promise<LoginResponse> {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
+      credentials: 'include', // Include cookies
       headers: {
         'Content-Type': 'application/json',
         'X-Requested-With': 'XMLHttpRequest'
       },
       body: JSON.stringify({ password, remember })
     })
-    
+
     if (!response.ok) {
       const error = await response.json()
       throw new Error(error.error || 'Login failed')
     }
-    
+
     const result = await response.json()
-    if (result.token) {
-      this.setToken(result.token)
+    if (result.success) {
+      this.setAuthenticated(true)
     }
     return result
   }
 
   // Logout
   async logout(): Promise<void> {
-    if (this.token) {
-      try {
-        await fetch(`${API_BASE_URL}/auth/logout`, {
-          method: 'POST',
-          headers: this.getAuthHeaders()
-        })
-      } catch (error) {
-        console.error('Logout error:', error)
-      }
+    try {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include', // Include cookies
+        headers: this.getAuthHeaders()
+      })
+    } catch (error) {
+      console.error('Logout error:', error)
     }
-    this.clearToken()
+    this.setAuthenticated(false)
   }
 
-  // Verify current token
-  async verifyToken(): Promise<boolean> {
-    if (!this.token) {
-      return false
-    }
-
+  // Verify current auth status
+  async verifyAuth(): Promise<boolean> {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/verify`, {
         method: 'POST',
+        credentials: 'include', // Include cookies
         headers: this.getAuthHeaders()
       })
-      
+
       if (!response.ok) {
-        this.clearToken()
+        this.setAuthenticated(false)
         return false
       }
-      
+
       const result = await response.json()
-      return result.valid === true
+      const isValid = result.valid === true
+      this.setAuthenticated(isValid)
+      return isValid
     } catch (error) {
-      console.error('Token verification error:', error)
+      console.error('Auth verification error:', error)
+      this.setAuthenticated(false)
       return false
     }
+  }
+
+  // Alias for verifyAuth (for backward compatibility)
+  async verifyToken(): Promise<boolean> {
+    return this.verifyAuth()
+  }
+
+  // Clear token/authentication (for backward compatibility)
+  clearToken(): void {
+    this.setAuthenticated(false)
+    // Token is in httpOnly cookie, cleared by logout endpoint
   }
 }
 

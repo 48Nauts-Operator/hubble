@@ -243,15 +243,16 @@ export function getBrandColors(url: string, title: string): { primary?: string; 
 
 export function getEnhancedFaviconUrl(url: string, title: string): string | null {
   const brand = detectBrandFromUrl(url) || detectBrandFromTitle(title)
-  
+
   if (brand?.faviconUrl) {
     return brand.faviconUrl
   }
-  
-  // Fallback to Google's favicon service
+
+  // Use our secure server-side favicon proxy to prevent SSRF attacks
   try {
     const domain = new URL(url).hostname
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
+    // This will be proxied through our backend with proper validation
+    return `/api/favicon?domain=${encodeURIComponent(domain)}`
   } catch {
     return null
   }

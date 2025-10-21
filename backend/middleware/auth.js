@@ -30,8 +30,11 @@ async function authMiddleware(req, res, next) {
       return next();
     }
 
-    // Check for authorization header
-    const token = req.headers.authorization?.replace('Bearer ', '');
+    // Check for token in cookie first, then authorization header (for backward compatibility)
+    const cookieToken = req.cookies?.auth_token;
+    const headerToken = req.headers.authorization?.replace('Bearer ', '');
+    const token = cookieToken || headerToken;
+
     if (!token) {
       return res.status(401).json({ error: 'Authentication required' });
     }

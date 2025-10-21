@@ -11,6 +11,17 @@ import type { Bookmark, BookmarkGroup } from '@/stores/useBookmarkStore'
 import { useBookmarkStore } from '@/stores/useBookmarkStore'
 import { validateBookmarkForm, type BookmarkFormData } from '@/utils/validation'
 
+type Environment = 'production' | 'staging' | 'uat' | 'development' | 'local'
+
+const VALID_ENVIRONMENTS: Environment[] = ['production', 'staging', 'uat', 'development', 'local']
+
+/**
+ * Type guard to validate environment values
+ */
+function isValidEnvironment(value: string): value is Environment {
+  return VALID_ENVIRONMENTS.includes(value as Environment)
+}
+
 interface EditBookmarkModalProps {
   isOpen: boolean
   onClose: () => void
@@ -26,7 +37,7 @@ export function EditBookmarkModal({ isOpen, onClose, bookmark, groups }: EditBoo
   const [groupId, setGroupId] = useState<string>('')
   const [tags, setTags] = useState('')
   const [icon, setIcon] = useState('')
-  const [environment, setEnvironment] = useState<'production' | 'staging' | 'uat' | 'development' | 'local'>('production')
+  const [environment, setEnvironment] = useState<Environment>('production')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -43,7 +54,11 @@ export function EditBookmarkModal({ isOpen, onClose, bookmark, groups }: EditBoo
       setGroupId(bookmark.groupId || '')
       setTags(bookmark.tags?.join(', ') || '')
       setIcon(bookmark.icon || '')
-      setEnvironment((bookmark.environment || 'production') as any)
+      setEnvironment(
+        bookmark.environment && isValidEnvironment(bookmark.environment)
+        ? bookmark.environment
+        : 'production'
+      )
     }
   }, [bookmark])
 
@@ -244,7 +259,12 @@ export function EditBookmarkModal({ isOpen, onClose, bookmark, groups }: EditBoo
                     <select
                       id="environment"
                       value={environment}
-                      onChange={(e) => setEnvironment(e.target.value as any)}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (isValidEnvironment(value)) {
+                          setEnvironment(value)
+                        }
+                      }}
                       className="w-full px-3 py-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                     >
                       <option value="production">Production</option>

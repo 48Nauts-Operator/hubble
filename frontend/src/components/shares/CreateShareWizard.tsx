@@ -442,9 +442,14 @@ export function CreateShareWizard({ isOpen, onClose, onSubmit, isSubmitting }: C
                 <label className="block text-sm font-medium mb-2">Theme</label>
                 <select
                   value={formData.appearance.theme}
-                  onChange={(e) => updateFormData({
-                    appearance: { ...formData.appearance, theme: e.target.value as any }
-                  })}
+                  onChange={(e) => {
+                    const theme = e.target.value;
+                    if (['system', 'light', 'dark'].includes(theme)) {
+                      updateFormData({
+                        appearance: { ...formData.appearance, theme: theme as 'system' | 'light' | 'dark' }
+                      });
+                    }
+                  }}
                   className="w-full px-3 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="system">System Default</option>
